@@ -1,0 +1,39 @@
+# hopOn.fr — robots.txt
+# Généré automatiquement — https://hopon.fr
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /.env
+Disallow: /node_modules/
+Disallow: /wp-admin/
+Disallow: /wp-login.php
+Disallow: /dashboard/
+Disallow: /auth/
+Disallow: /checkout/confirmation/
+
+# Autorisations explicites des crawlers IA
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+# Sitemaps
+Sitemap: https://hopon.fr/sitemap.xml
+Sitemap: https://hopon.fr/sitemap-images.xml
+Sitemap: https://hopon.fr/sitemap-news.xml
+
+# Crawl delay pour les bots moins importants
+User-agent: Baiduspider
+Crawl-delay: 5
+
+User-agent: YandexBot
+Crawl-delay: 3

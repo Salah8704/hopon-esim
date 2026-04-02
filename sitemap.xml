@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="/sitemap.xsl"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+
+  <!-- ── Homepage ─────────────────────────────────────── -->
+  <url>
+    <loc>https://hopon.fr/</loc>
+    <lastmod>2025-01-15</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="fr"      href="https://hopon.fr/"/>
+    <xhtml:link rel="alternate" hreflang="en"      href="https://hopon.fr/en/"/>
+    <xhtml:link rel="alternate" hreflang="es"      href="https://hopon.fr/es/"/>
+    <xhtml:link rel="alternate" hreflang="de"      href="https://hopon.fr/de/"/>
+    <xhtml:link rel="alternate" hreflang="it"      href="https://hopon.fr/it/"/>
+    <xhtml:link rel="alternate" hreflang="pt"      href="https://hopon.fr/pt/"/>
+    <xhtml:link rel="alternate" hreflang="ar"      href="https://hopon.fr/ar/"/>
+    <xhtml:link rel="alternate" hreflang="ja"      href="https://hopon.fr/ja/"/>
+    <xhtml:link rel="alternate" hreflang="zh"      href="https://hopon.fr/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://hopon.fr/"/>
+  </url>
+
+  <!-- ── Pages statiques ─────────────────────────────── -->
+  <url><loc>https://hopon.fr/destinations/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/forfaits/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/pro/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/partenaires/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/contact/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/faq/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/guides/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/guides/comment-installer-esim/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/guides/compatibilite-esim/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/guides/esim-iphone/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/guides/esim-samsung/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/guides/esim-google-pixel/</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+
+  <!-- ── Régions ─────────────────────────────────────── -->
+  <url><loc>https://hopon.fr/esim/asie/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/europe/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/afrique/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/ameriques/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/moyen-orient/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/monde/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+
+  <!-- ── Catégories commerciales ─────────────────────── -->
+  <url><loc>https://hopon.fr/esim/week-end/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/court-sejour/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/long-sejour/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/business/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/multi-destination/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+
+  <!-- ── Pages pays (top 35 destinations) ────────────── -->
+  <url><loc>https://hopon.fr/esim/japon/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/maroc/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/thailande/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/usa/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/italie/</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://hopon.fr/esim/bali/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/emirats/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/espagne/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/australie/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/turquie/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/egypte/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/grece/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/portugal/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/france/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/royaume-uni/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/inde/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/singapour/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/vietnam/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/maldives/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/cambodge/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/jordanie/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/bresil/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/mexique/</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://hopon.fr/esim/argentine/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/cuba/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/perou/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/colombie/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/kenya/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/afrique-du-sud/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/senegal/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/tanzanie/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/maurice/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/islande/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://hopon.fr/esim/nouvelle-zelande/</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+</urlset>
