@@ -19,7 +19,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.tr
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error('CORS: ' + origin + ' non autorise'));
+    cb(new Error('CORS: ' + origin));
   },
   credentials: true,
 }));
@@ -32,29 +32,22 @@ app.use((req, res, next) => {
 
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 
-// Health check — toujours repond 200
+// Health check — toujours 200
 app.get('/health', async (req, res) => {
   let dbOk = false;
   try { await db.query('SELECT 1'); dbOk = true; } catch(e) {}
-  res.status(200).json({
-    status: dbOk ? 'ok' : 'degraded',
-    db: dbOk ? 'connected' : 'unavailable',
-    ts: new Date().toISOString(),
-  });
+  res.status(200).json({ status: dbOk ? 'ok' : 'degraded', db: dbOk ? 'connected' : 'unavailable', ts: new Date().toISOString() });
 });
 
 // Routes
 try {
-  const catalogRoutes  = require('./routes/catalog');
-  const ordersRoutes   = require('./routes/orders');
-  const adminRoutes    = require('./routes/admin');
-  const wcWebhook      = require('./webhooks/woocommerce');
-  const partnersRoutes = require('./routes/partners');
-  app.use('/api/v1/catalog',  catalogRoutes);
-  app.use('/api/v1/orders',   ordersRoutes);
-  app.use('/api/v1/admin',    adminRoutes);
-  app.use('/api/v1/partners', partnersRoutes);
-  app.use('/webhooks',        wcWebhook);
+  app.use('/api/v1/catalog',  require('./routes/catalog'));
+  app.use('/api/v1/orders',   require('./routes/orders'));
+  app.use('/api/v1/admin',    require('./routes/admin'));
+  app.use('/api/v1/partners', require('./routes/partners'));
+  app.use('/api/v1/stripe',   require('./routes/stripe'));
+  app.use('/webhooks/stripe',  require('./routes/stripe').webhook || ((req,res)=>res.json({ok:true})));
+  app.use('/webhooks',        require('./webhooks/woocommerce'));
   logger.info('Routes chargees');
 } catch(e) {
   logger.error('Erreur routes: ' + e.message);
@@ -65,13 +58,9 @@ if (process.env.REDIS_URL) {
   try {
     const { worker } = require('./jobs/queue');
     const esimSvc = require('./services/esim');
-    worker.process('process-esim', 5, async (job) => {
-      await esimSvc.processEsimOrder(job.data.orderId);
-    });
+    worker.process('process-esim', 5, async (job) => { await esimSvc.processEsimOrder(job.data.orderId); });
     logger.info('Worker Bull demarre');
-  } catch(e) {
-    logger.warn('Worker non disponible: ' + e.message);
-  }
+  } catch(e) { logger.warn('Worker non disponible: ' + e.message); }
 }
 
 // Cron optionnel
@@ -81,19 +70,13 @@ try {
   new CronJob(process.env.CATALOG_SYNC_CRON || '0 */4 * * *', async () => {
     await catalogSvc.syncCatalog({ mode: 'incremental' }).catch(e => logger.error('Sync: ' + e.message));
   }, null, true, 'Europe/Paris');
-} catch(e) {
-  logger.warn('Cron non demarre: ' + e.message);
-}
+} catch(e) { logger.warn('Cron non demarre: ' + e.message); }
 
 const PORT = parseInt(process.env.PORT) || 3001;
 app.listen(PORT, async () => {
   logger.info('hopOn Backend demarre sur port ' + PORT);
-  try {
-    await db.query('SELECT 1');
-    logger.info('PostgreSQL connecte');
-  } catch(e) {
-    logger.warn('PostgreSQL indisponible au demarrage: ' + e.message);
-  }
+  try { await db.query('SELECT 1'); logger.info('PostgreSQL connecte'); }
+  catch(e) { logger.warn('PostgreSQL indisponible: ' + e.message); }
 });
 
 module.exports = app;
