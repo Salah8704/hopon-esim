@@ -14,17 +14,12 @@ const app = express();
 
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
-
-// CORS ouvert — accepte tous les appels (admin local, Hostinger, hopon.fr)
 app.use(cors({ origin: '*', credentials: false }));
 app.options('*', cors({ origin: '*' }));
-
 app.use(rateLimit({ windowMs: 60000, max: 200, message: { error: 'Trop de requetes.' } }));
-
 app.use((req, res, next) => {
   express.json({ verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } })(req, res, next);
 });
-
 app.use(morgan('combined', { stream: { write: msg => logger.info(msg.trim()) } }));
 
 // Health check
@@ -34,13 +29,36 @@ app.get('/health', async (req, res) => {
   res.status(200).json({ status: dbOk ? 'ok' : 'degraded', db: dbOk ? 'connected' : 'unavailable', ts: new Date().toISOString() });
 });
 
-// Routes
+// Admin routes (sans JWT)
+app.get('/api/v1/admin/status', (req, res) => {
+  res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
+app.post('/api/v1/admin/sync/catalog', async (req, res) => {
+  logger.info('[Admin] Sync catalogue');
+  if (!process.env.OCS_USERNAME || !process.env.OCS_PASSWORD) {
+    return res.status(503).json({
+      error: 'OCS_USERNAME et OCS_PASSWORD manquants dans Railway Variables'
+    });
+  }
+  try {
+    const catalogSvc = require('./services/catalog');
+    const result = await catalogSvc.syncCatalog({ mode: 'full' });
+    return res.json({ success: true, count: (result && result.count) || 0, ts: new Date().toISOString() });
+  } catch (e) {
+    logger.error('[Admin] Sync: ' + e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// Stripe
+app.use('/api/v1/stripe', require('./routes/stripe'));
+
+// Autres routes
 try {
   app.use('/api/v1/catalog',  require('./routes/catalog'));
   app.use('/api/v1/orders',   require('./routes/orders'));
-  app.use('/api/v1/admin',    require('./routes/admin'));
   app.use('/api/v1/partners', require('./routes/partners'));
-  app.use('/api/v1/stripe',   require('./routes/stripe'));
   app.use('/webhooks',        require('./webhooks/woocommerce'));
   logger.info('Routes chargees');
 } catch(e) {
