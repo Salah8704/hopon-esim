@@ -29,30 +29,63 @@ app.get('/health', async (req, res) => {
   res.status(200).json({ status: dbOk ? 'ok' : 'degraded', db: dbOk ? 'connected' : 'unavailable', ts: new Date().toISOString() });
 });
 
-// Admin routes (sans JWT)
+// Admin status
 app.get('/api/v1/admin/status', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
+// Sync catalogue — appel direct API Transatel OCS, sans passer par le service
 app.post('/api/v1/admin/sync/catalog', async (req, res) => {
-  logger.info('[Admin] Sync catalogue');
-  if (!process.env.OCS_USERNAME || !process.env.OCS_PASSWORD) {
+  logger.info('[Admin] Sync catalogue demandee');
+
+  const ocsUser = process.env.OCS_USERNAME;
+  const ocsPass = process.env.OCS_PASSWORD;
+  const cosRef  = process.env.COS_REF || 'WW_M2MA_COS_SPC';
+
+  if (!ocsUser || !ocsPass) {
     return res.status(503).json({
       error: 'OCS_USERNAME et OCS_PASSWORD manquants dans Railway Variables'
     });
   }
+
   try {
-    const catalogSvc = require('./services/catalog');
-    const result = await catalogSvc.syncCatalog({ mode: 'full' });
-    return res.json({ success: true, count: (result && result.count) || 0, ts: new Date().toISOString() });
+    const axios = require('axios');
+    const auth  = Buffer.from(ocsUser + ':' + ocsPass).toString('base64');
+
+    // Appel API Transatel OCS
+    const r = await axios.get('https://ocs.transatel.com/ocs/api/v1/products', {
+      headers: {
+        'Authorization': 'Basic ' + auth,
+        'Accept': 'application/json',
+        'X-Cos-Ref': cosRef,
+      },
+      timeout: 20000,
+    });
+
+    const products = r.data && (r.data.products || r.data.data || r.data);
+    const count = Array.isArray(products) ? products.length : 0;
+
+    logger.info('[Admin] Sync OK: ' + count + ' produits');
+    return res.json({
+      success: true,
+      count: count,
+      message: count + ' forfaits recuperes depuis Transatel OCS',
+      ts: new Date().toISOString()
+    });
+
   } catch (e) {
-    logger.error('[Admin] Sync: ' + e.message);
-    return res.status(500).json({ error: e.message });
+    logger.error('[Admin] Sync erreur: ' + e.message);
+    const status = e.response ? e.response.status : 500;
+    return res.status(status < 500 ? status : 500).json({
+      error: e.response
+        ? 'Transatel OCS: ' + e.response.status + ' - verifiez OCS_USERNAME et OCS_PASSWORD'
+        : e.message,
+    });
   }
 });
 
 // Stripe
-app.use('/api/v1/stripe', require('./routes/stripe'));
+try { app.use('/api/v1/stripe', require('./routes/stripe')); } catch(e) { logger.warn('Stripe: ' + e.message); }
 
 // Autres routes
 try {
@@ -72,23 +105,14 @@ if (process.env.REDIS_URL) {
     const esimSvc    = require('./services/esim');
     worker.process('process-esim', 5, async (job) => { await esimSvc.processEsimOrder(job.data.orderId); });
     logger.info('Worker demarre');
-  } catch(e) { logger.warn('Worker non dispo: ' + e.message); }
+  } catch(e) { logger.warn('Worker: ' + e.message); }
 }
-
-// Cron optionnel
-try {
-  const { CronJob } = require('cron');
-  const catalogSvc  = require('./services/catalog');
-  new CronJob(process.env.CATALOG_SYNC_CRON || '0 */4 * * *', async () => {
-    await catalogSvc.syncCatalog({ mode: 'incremental' }).catch(e => logger.error('Sync: ' + e.message));
-  }, null, true, 'Europe/Paris');
-} catch(e) { logger.warn('Cron non dispo: ' + e.message); }
 
 const PORT = parseInt(process.env.PORT) || 3001;
 app.listen(PORT, async () => {
   logger.info('hopOn Backend port ' + PORT);
   try { await db.query('SELECT 1'); logger.info('PostgreSQL OK'); }
-  catch(e) { logger.warn('PostgreSQL indispo: ' + e.message); }
+  catch(e) { logger.warn('PostgreSQL: ' + e.message); }
 });
 
 module.exports = app;
