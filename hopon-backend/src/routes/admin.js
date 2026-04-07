@@ -27,7 +27,7 @@ router.post('/sync/catalog', optionalAuth, async (req, res) => {
   try {
     const catalogSvc = require('../services/catalog');
     const result = await catalogSvc.syncCatalog({ mode: 'full' });
-    return res.json({ success: true, count: result && result.count || 0, ts: new Date().toISOString() });
+    return res.json({ success: true, count: (result && result.count) || 0, ts: new Date().toISOString() });
   } catch (e) {
     logger.error('[Admin] Sync: ' + e.message);
     return res.status(500).json({ error: e.message });
