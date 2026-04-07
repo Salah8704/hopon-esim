@@ -1,8 +1,47 @@
 'use strict';
+/**
+ * Transatel OCS Catalog Service
+ * Auth: OAuth2 client_credentials
+ * Ref: https://developers.transatel.com/docs/getting-started/
+ */
 const axios  = require('axios');
 const { db } = require('../db/pool');
 const logger = require('../utils/logger');
 
+const TRANSATEL_BASE = 'https://api.transatel.com';
+
+// Cache token en memoire
+let _tokenCache = null;
+let _tokenExpiry = 0;
+
+// Etape 1 : obtenir un Bearer token via OAuth2 client_credentials
+async function getAccessToken() {
+  if (_tokenCache && Date.now() < _tokenExpiry - 60000) {
+    return _tokenCache;
+  }
+  const clientId     = process.env.OCS_USERNAME;
+  const clientSecret = process.env.OCS_PASSWORD;
+  const credentials  = Buffer.from(clientId + ':' + clientSecret).toString('base64');
+
+  logger.info('[Catalog] Obtention token Transatel...');
+  const r = await axios.post(
+    TRANSATEL_BASE + '/authentication/api/token',
+    'grant_type=client_credentials',
+    {
+      headers: {
+        'Authorization': 'Basic ' + credentials,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      timeout: 15000
+    }
+  );
+  _tokenCache = r.data.access_token;
+  _tokenExpiry = Date.now() + (r.data.expires_in || 3600) * 1000;
+  logger.info('[Catalog] Token obtenu, expire dans ' + r.data.expires_in + 's');
+  return _tokenCache;
+}
+
+// Creer la table products si elle n'existe pas
 async function ensureTables() {
   try {
     await db.query(`
@@ -11,9 +50,10 @@ async function ensureTables() {
         ocs_ref        VARCHAR(255) UNIQUE NOT NULL,
         name           VARCHAR(500) NOT NULL,
         description    TEXT,
-        data_mb        INTEGER DEFAULT 0,
+        data_kb        BIGINT DEFAULT 0,
         duration_days  INTEGER DEFAULT 30,
-        zones          TEXT[],
+        duration_unit  VARCHAR(50) DEFAULT 'days',
+        countries      TEXT[],
         supplier_price DECIMAL(10,2) DEFAULT 0,
         public_price   DECIMAL(10,2) DEFAULT 0,
         currency       VARCHAR(10) DEFAULT 'EUR',
@@ -24,70 +64,97 @@ async function ensureTables() {
         updated_at     TIMESTAMP DEFAULT NOW()
       )
     `);
+    logger.info('[Catalog] Table products OK');
   } catch(e) {
     logger.warn('[Catalog] ensureTables: ' + e.message);
   }
 }
 
-async function fetchOcsOffers() {
-  const user    = process.env.OCS_USERNAME;
-  const pass    = process.env.OCS_PASSWORD;
-  const cosRef  = process.env.COS_REF || 'WW_M2MA_COS_SPC';
-  // URL configurable — mettez OCS_BASE_URL dans Railway Variables
-  const baseUrl = process.env.OCS_BASE_URL || 'https://ocs.transatel.com/api/b2b/v1';
-  const auth    = Buffer.from(user + ':' + pass).toString('base64');
+// Etape 2 : recuperer les produits du catalogue
+async function fetchCatalogProducts(token) {
+  const cos = process.env.OCS_COS_REF || process.env.COS_REF || 'WW_M2MA_COS_SPC';
+  const url = TRANSATEL_BASE + '/ocs/catalog/api/cos/' + cos + '/products';
+  logger.info('[Catalog] GET ' + url);
 
-  logger.info('[Catalog] Appel OCS: ' + baseUrl + '/catalog/offers');
+  const r = await axios.get(url, {
+    headers: {
+      'Authorization': 'Bearer ' + token,
+      'Accept': 'application/json'
+    },
+    timeout: 30000
+  });
 
-  try {
-    const r = await axios.get(baseUrl + '/catalog/offers', {
-      headers: { 'Authorization': 'Basic ' + auth, 'Accept': 'application/json', 'X-Cos-Ref': cosRef },
-      timeout: 30000
-    });
-    const offers = r.data && r.data.offers ? r.data.offers : (Array.isArray(r.data) ? r.data : []);
-    logger.info('[Catalog] ' + offers.length + ' offres recues');
-    return offers;
-  } catch(e) {
-    const status  = e.response ? e.response.status : 'NETWORK';
-    const message = e.response ? JSON.stringify(e.response.data).slice(0,200) : e.message;
-    logger.error('[Catalog] OCS erreur ' + status + ': ' + message);
-    throw new Error('Erreur API Transatel (' + status + '): ' + message + 
-      '. Verifiez OCS_BASE_URL, OCS_USERNAME, OCS_PASSWORD dans Railway Variables.');
-  }
+  // La reponse contient products[]
+  const products = r.data && r.data.products ? r.data.products : (Array.isArray(r.data) ? r.data : []);
+  logger.info('[Catalog] ' + products.length + ' produits trouves');
+  return products;
 }
 
+// Sync catalogue complete
 async function syncCatalog({ mode = 'full' } = {}) {
-  logger.info('[Catalog] Sync ' + mode);
+  logger.info('[Catalog] Sync ' + mode + ' démarrée');
   await ensureTables();
 
-  const offers = await fetchOcsOffers();
+  // Authentification
+  let token;
+  try {
+    token = await getAccessToken();
+  } catch(e) {
+    const msg = e.response
+      ? 'Auth echouee (' + e.response.status + '): ' + JSON.stringify(e.response.data).slice(0, 200)
+      : 'Auth echouee: ' + e.message;
+    logger.error('[Catalog] ' + msg);
+    throw new Error(msg + ' — Verifiez OCS_USERNAME et OCS_PASSWORD dans Railway Variables');
+  }
 
+  // Recuperation produits
+  let products;
+  try {
+    products = await fetchCatalogProducts(token);
+  } catch(e) {
+    const msg = e.response
+      ? 'Catalogue erreur (' + e.response.status + '): ' + JSON.stringify(e.response.data).slice(0, 200)
+      : 'Catalogue erreur: ' + e.message;
+    logger.error('[Catalog] ' + msg);
+    throw new Error(msg + ' — Verifiez OCS_COS_REF dans Railway Variables');
+  }
+
+  // Upsert en base
   let inserted = 0, errors = 0;
-  for (const offer of offers) {
+  for (const p of products) {
     try {
-      const ocsRef = String(offer.ref || offer.id || offer.offerRef || offer.offerCode || Math.random());
-      const name   = offer.name || offer.label || offer.offerName || 'Offre ' + ocsRef;
-      const dataMb = parseInt(offer.dataVolumeMB || offer.dataMb || offer.quota || 0);
-      const days   = parseInt(offer.validityDays || offer.duration || offer.validity || 30);
-      const price  = parseFloat(offer.supplierPrice || offer.price || offer.unitPrice || 0);
-      const zones  = Array.isArray(offer.zones || offer.countries) ? (offer.zones || offer.countries) : [];
+      const def    = p.productDefinition || p;
+      const ocsRef = def.productId || def.id || String(Math.random());
+      const name   = def.productId || ocsRef;
+
+      // Extraire data allowance
+      const dataAllowance = def.allowances && def.allowances.data && def.allowances.data[0];
+      const dataKb  = dataAllowance ? parseInt(dataAllowance.resourceValue || 0) : 0;
+
+      // Duree
+      const vp   = def.validityPeriod || {};
+      const days = vp.validityDuration || 30;
+      const unit = vp.validityDurationUnit || 'days';
+
+      // Pays
+      const countries = def.countryList || [];
 
       await db.query(
-        `INSERT INTO products (ocs_ref, name, data_mb, duration_days, supplier_price, currency, zones, raw_data, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+        `INSERT INTO products (ocs_ref, name, data_kb, duration_days, duration_unit, countries, raw_data, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
          ON CONFLICT (ocs_ref) DO UPDATE
-         SET name=$2, data_mb=$3, duration_days=$4, supplier_price=$5, currency=$6, zones=$7, raw_data=$8, updated_at=NOW()`,
-        [ocsRef, name, dataMb, days, price, offer.currency||'EUR', zones, JSON.stringify(offer)]
+         SET name=$2, data_kb=$3, duration_days=$4, duration_unit=$5, countries=$6, raw_data=$7, updated_at=NOW()`,
+        [ocsRef, name, dataKb, days, unit, countries, JSON.stringify(p)]
       );
       inserted++;
     } catch(e) {
-      logger.error('[Catalog] Produit erreur: ' + e.message);
+      logger.error('[Catalog] Upsert erreur: ' + e.message);
       errors++;
     }
   }
 
-  const result = { count: inserted, errors, total: offers.length, ts: new Date().toISOString() };
-  logger.info('[Catalog] Terminee: ' + JSON.stringify(result));
+  const result = { count: inserted, errors, total: products.length, ts: new Date().toISOString() };
+  logger.info('[Catalog] Sync terminee: ' + JSON.stringify(result));
   return result;
 }
 
