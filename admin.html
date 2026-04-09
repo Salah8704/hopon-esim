@@ -456,7 +456,19 @@ function buildOrders(){
     {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
     {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Brouillon'},
   ];
-  const tpl=r=>`<tr><td>${r.id}</td><td style="font-size:11px">${r.cl}</td><td>${r.dest}</td><td>${r.plan}</td><td><code>${r.sid}</code></td><td style="font-family:monospace;font-size:10px;color:var(--txtd)">${r.iccid}</td><td style="color:var(--txtd);font-style:italic">${r.pub}</td><td style="color:var(--txtd);font-style:italic">${r.sup}</td><td><span class="badge ${r.st}">${r.lb}</span></td></tr>`;
+  function tpl(r){
+    return '<tr>'
+      + '<td>' + r.id + '</td>'
+      + '<td style="font-size:11px">' + r.cl + '</td>'
+      + '<td>' + r.dest + '</td>'
+      + '<td>' + r.plan + '</td>'
+      + '<td><code>' + r.sid + '</code></td>'
+      + '<td style="font-family:monospace;font-size:10px;color:var(--txtd)">' + r.iccid + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.pub + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.sup + '</td>'
+      + '<td><span class="badge ' + r.st + '">' + r.lb + '</span></td>'
+      + '</tr>';
+  }
   const b1=document.getElementById('o-tbody'),b2=document.getElementById('o2-tbody');
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
