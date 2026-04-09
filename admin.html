@@ -120,7 +120,7 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
     <input type="password" class="l-input" id="lp" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="l-btn" onclick="doLogin()">Connexion →</button>
     <div class="l-err" id="l-err">Identifiants incorrects</div>
-    <div class="l-hint">Démo : admin / hopon2025</div>
+    <div class="l-hint">Démo : admin / hopon2025 · <a href="#" onclick="resetAdminOverrides();return false;" style="color:var(--blue)">réinitialiser</a></div>
   </div>
 </div>
 
@@ -374,9 +374,14 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
 const ADMIN_AUTH_KEY='hopon_admin_auth';
 
 function getAdminCredentials(){
-  const u=(localStorage.getItem('hopon_admin_user')||'admin').trim();
-  const p=(localStorage.getItem('hopon_admin_pass')||'hopon2025').trim();
-  return {u,p};
+  const defaultCreds={u:'admin',p:'hopon2025'};
+  const storedUser=(localStorage.getItem('hopon_admin_user')||'').trim();
+  const storedPass=(localStorage.getItem('hopon_admin_pass')||'').trim();
+  const list=[defaultCreds];
+  if(storedUser && storedPass){
+    list.push({u:storedUser,p:storedPass});
+  }
+  return list;
 }
 
 function openAdminSession(){
@@ -391,15 +396,17 @@ function doLogin(){
   const inputUser=(document.getElementById('lu').value||'').trim().toLowerCase();
   const inputPass=(document.getElementById('lp').value||'').trim();
   const creds=getAdminCredentials();
-  const ok=inputUser===creds.u.toLowerCase() && inputPass===creds.p;
+  const ok=creds.some(function(c){
+    return inputUser===c.u.toLowerCase() && inputPass===c.p;
+  });
 
   if(ok){
     openAdminSession();
   }else{
     const err=document.getElementById('l-err');
-    err.textContent='Identifiants incorrects';
+    err.textContent='Identifiants incorrects (essayez admin / hopon2025)';
     err.style.display='block';
-    setTimeout(()=>err.style.display='none',3000);
+    setTimeout(()=>err.style.display='none',4000);
   }
 }
 function doLogout(){
@@ -410,6 +417,18 @@ function doLogout(){
   try{ localStorage.removeItem(ADMIN_AUTH_KEY); }catch(e){}
 }
 
+
+function resetAdminOverrides(){
+  try{
+    localStorage.removeItem('hopon_admin_user');
+    localStorage.removeItem('hopon_admin_pass');
+    localStorage.removeItem(ADMIN_AUTH_KEY);
+  }catch(e){}
+  const err=document.getElementById('l-err');
+  err.textContent='Configuration admin réinitialisée. Reconnectez-vous.';
+  err.style.display='block';
+  setTimeout(()=>err.style.display='none',3000);
+}
 
 (function initAdminAuth(){
   try{
@@ -437,7 +456,19 @@ function buildOrders(){
     {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
     {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Brouillon'},
   ];
-  const tpl=r=>`<tr><td>${r.id}</td><td style="font-size:11px">${r.cl}</td><td>${r.dest}</td><td>${r.plan}</td><td><code>${r.sid}</code></td><td style="font-family:monospace;font-size:10px;color:var(--txtd)">${r.iccid}</td><td style="color:var(--txtd);font-style:italic">${r.pub}</td><td style="color:var(--txtd);font-style:italic">${r.sup}</td><td><span class="badge ${r.st}">${r.lb}</span></td></tr>`;
+  function tpl(r){
+    return '<tr>'
+      + '<td>' + r.id + '</td>'
+      + '<td style="font-size:11px">' + r.cl + '</td>'
+      + '<td>' + r.dest + '</td>'
+      + '<td>' + r.plan + '</td>'
+      + '<td><code>' + r.sid + '</code></td>'
+      + '<td style="font-family:monospace;font-size:10px;color:var(--txtd)">' + r.iccid + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.pub + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.sup + '</td>'
+      + '<td><span class="badge ' + r.st + '">' + r.lb + '</span></td>'
+      + '</tr>';
+  }
   const b1=document.getElementById('o-tbody'),b2=document.getElementById('o2-tbody');
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
