@@ -432,9 +432,6 @@ function resetAdminOverrides(){
 
 (function initAdminAuth(){
   try{
-    const params=new URLSearchParams(location.search);
-    if(params.get('admin_user')) localStorage.setItem('hopon_admin_user',params.get('admin_user'));
-    if(params.get('admin_pass')) localStorage.setItem('hopon_admin_pass',params.get('admin_pass'));
     if(localStorage.getItem(ADMIN_AUTH_KEY)==='1') openAdminSession();
   }catch(e){}
 })();
