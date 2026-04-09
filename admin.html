@@ -371,16 +371,34 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
 </div><!-- /admin -->
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+const ADMIN_AUTH_KEY='hopon_admin_auth';
+
+function getAdminCredentials(){
+  const u=(localStorage.getItem('hopon_admin_user')||'admin').trim();
+  const p=(localStorage.getItem('hopon_admin_pass')||'hopon2025').trim();
+  return {u,p};
+}
+
+function openAdminSession(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('admin').classList.add('on');
+  document.getElementById('admin-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  try{ localStorage.setItem(ADMIN_AUTH_KEY,'1'); }catch(e){}
+  buildAll();
+}
+
 function doLogin(){
-  const u=document.getElementById('lu').value;
-  const p=document.getElementById('lp').value;
-  if(u==='admin'&&p==='hopon2025'){
-    document.getElementById('login').style.display='none';
-    document.getElementById('admin').classList.add('on');
-    document.getElementById('admin-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-    buildAll();
+  const inputUser=(document.getElementById('lu').value||'').trim().toLowerCase();
+  const inputPass=(document.getElementById('lp').value||'').trim();
+  const creds=getAdminCredentials();
+  const ok=inputUser===creds.u.toLowerCase() && inputPass===creds.p;
+
+  if(ok){
+    openAdminSession();
   }else{
-    const err=document.getElementById('l-err');err.style.display='block';
+    const err=document.getElementById('l-err');
+    err.textContent='Identifiants incorrects';
+    err.style.display='block';
     setTimeout(()=>err.style.display='none',3000);
   }
 }
@@ -389,7 +407,18 @@ function doLogout(){
   document.getElementById('login').style.display='flex';
   document.getElementById('lu').value='';
   document.getElementById('lp').value='';
+  try{ localStorage.removeItem(ADMIN_AUTH_KEY); }catch(e){}
 }
+
+
+(function initAdminAuth(){
+  try{
+    const params=new URLSearchParams(location.search);
+    if(params.get('admin_user')) localStorage.setItem('hopon_admin_user',params.get('admin_user'));
+    if(params.get('admin_pass')) localStorage.setItem('hopon_admin_pass',params.get('admin_pass'));
+    if(localStorage.getItem(ADMIN_AUTH_KEY)==='1') openAdminSession();
+  }catch(e){}
+})();
 
 const PAGE_TITLES={overview:'Dashboard',orders:'Commandes',esim:'eSIM Stock',prices:'Gestion des prix',sync:'Sync API fournisseur',storylines:'Visuels & Narration',woo:'Architecture WooCommerce',webhooks:'Webhooks & Logs',clients:'Clients','pro-admin':'Comptes Pro (Admin)',seo:'Pages SEO',faq:'FAQ & Guides'};
 function showPage(id,el){
