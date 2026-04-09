@@ -503,4 +503,16 @@ function buildSyncLogs(){
 }
 
 function buildWHLogs(){
-  const c=document.getElementById('wh-logs')
+  const c=document.getElementById('wh-logs');if(!c)return;
+  const logs=[
+    {t:'12:10:01',ok:true,m:'Webhook order.created reçu',src:'woo#4821 · statut pending'},
+    {t:'12:10:03',ok:true,m:'Webhook payment.succeeded reçu',src:'woo#4821 · Stripe PI confirmé'},
+    {t:'12:10:04',ok:true,m:'Webhook esim.provisioned envoyé',src:'OCS-JP-002 · ICCID 8940..4821'},
+    {t:'12:10:05',ok:false,m:'Webhook partner.notify en échec',src:'Tentative 1/3 · timeout fournisseur'}
+  ];
+  c.innerHTML=logs.map(l=>`<div class="log-row"><span class="log-t">${l.t}</span><div class="log-dot" style="background:${l.ok?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${l.m}</div>${l.src?`<div class="log-src">${l.src}</div>`:''}</div></div>`).join('');
+}
+
+</script>
+</body>
+</html>
