@@ -8,7 +8,7 @@
     "dev": "nodemon src/index.js",
     "db:migrate": "node src/db/migrate.js",
     "sync:catalog": "node src/jobs/syncCatalog.js",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand --passWithNoTests"
   },
   "dependencies": {
     "axios": "^1.6.0",

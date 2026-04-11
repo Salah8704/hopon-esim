@@ -120,7 +120,7 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
     <input type="password" class="l-input" id="lp" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')doLogin()">
     <button class="l-btn" onclick="doLogin()">Connexion →</button>
     <div class="l-err" id="l-err">Identifiants incorrects</div>
-    <div class="l-hint">Démo : admin / hopon2025</div>
+    <div class="l-hint">Démo : admin / hopon2025 · <a href="#" onclick="resetAdminOverrides();return false;" style="color:var(--blue)">réinitialiser</a></div>
   </div>
 </div>
 
@@ -371,17 +371,69 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
 </div><!-- /admin -->
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+const ADMIN_AUTH_KEY='hopon_admin_auth';
+const ADMIN_SECRET_KEY='hopon_admin_secret';
+const ADMIN_API_BASE=(location.origin||'') + '/api/v1/admin';
+
+function getAdminSecret(){
+  try{ return (localStorage.getItem(ADMIN_SECRET_KEY)||'').trim(); }catch(e){ return ''; }
+}
+
+async function adminFetch(path, options){
+  const opts=options||{};
+  const headers=Object.assign({}, opts.headers||{});
+  const secret=getAdminSecret();
+  if(secret) headers['x-admin-secret']=secret;
+  const res=await fetch(ADMIN_API_BASE + path, Object.assign({}, opts, {headers}));
+  if(res.status===401){
+    const entered=prompt('Secret admin requis (ADMIN_SECRET). Laisser vide si non configuré :','');
+    if(entered!==null){
+      try{ localStorage.setItem(ADMIN_SECRET_KEY, entered.trim()); }catch(e){}
+      return adminFetch(path, options);
+    }
+  }
+  if(!res.ok){
+    let msg='Erreur API admin';
+    try{ const j=await res.json(); if(j && j.error) msg=j.error; }catch(e){}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function getAdminCredentials(){
+  const defaultCreds={u:'admin',p:'hopon2025'};
+  const storedUser=(localStorage.getItem('hopon_admin_user')||'').trim();
+  const storedPass=(localStorage.getItem('hopon_admin_pass')||'').trim();
+  const list=[defaultCreds];
+  if(storedUser && storedPass){
+    list.push({u:storedUser,p:storedPass});
+  }
+  return list;
+}
+
+function openAdminSession(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('admin').classList.add('on');
+  document.getElementById('admin-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+  try{ localStorage.setItem(ADMIN_AUTH_KEY,'1'); }catch(e){}
+  buildAll();
+}
+
 function doLogin(){
-  const u=document.getElementById('lu').value;
-  const p=document.getElementById('lp').value;
-  if(u==='admin'&&p==='hopon2025'){
-    document.getElementById('login').style.display='none';
-    document.getElementById('admin').classList.add('on');
-    document.getElementById('admin-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
-    buildAll();
+  const inputUser=(document.getElementById('lu').value||'').trim().toLowerCase();
+  const inputPass=(document.getElementById('lp').value||'').trim();
+  const creds=getAdminCredentials();
+  const ok=creds.some(function(c){
+    return inputUser===c.u.toLowerCase() && inputPass===c.p;
+  });
+
+  if(ok){
+    openAdminSession();
   }else{
-    const err=document.getElementById('l-err');err.style.display='block';
-    setTimeout(()=>err.style.display='none',3000);
+    const err=document.getElementById('l-err');
+    err.textContent='Identifiants incorrects (essayez admin / hopon2025)';
+    err.style.display='block';
+    setTimeout(()=>err.style.display='none',4000);
   }
 }
 function doLogout(){
@@ -389,7 +441,27 @@ function doLogout(){
   document.getElementById('login').style.display='flex';
   document.getElementById('lu').value='';
   document.getElementById('lp').value='';
+  try{ localStorage.removeItem(ADMIN_AUTH_KEY); }catch(e){}
 }
+
+
+function resetAdminOverrides(){
+  try{
+    localStorage.removeItem('hopon_admin_user');
+    localStorage.removeItem('hopon_admin_pass');
+    localStorage.removeItem(ADMIN_AUTH_KEY);
+  }catch(e){}
+  const err=document.getElementById('l-err');
+  err.textContent='Configuration admin réinitialisée. Reconnectez-vous.';
+  err.style.display='block';
+  setTimeout(()=>err.style.display='none',3000);
+}
+
+(function initAdminAuth(){
+  try{
+    if(localStorage.getItem(ADMIN_AUTH_KEY)==='1') openAdminSession();
+  }catch(e){}
+})();
 
 const PAGE_TITLES={overview:'Dashboard',orders:'Commandes',esim:'eSIM Stock',prices:'Gestion des prix',sync:'Sync API fournisseur',storylines:'Visuels & Narration',woo:'Architecture WooCommerce',webhooks:'Webhooks & Logs',clients:'Clients','pro-admin':'Comptes Pro (Admin)',seo:'Pages SEO',faq:'FAQ & Guides'};
 function showPage(id,el){
@@ -408,7 +480,19 @@ function buildOrders(){
     {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
     {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Brouillon'},
   ];
-  const tpl=r=>`<tr><td>${r.id}</td><td style="font-size:11px">${r.cl}</td><td>${r.dest}</td><td>${r.plan}</td><td><code>${r.sid}</code></td><td style="font-family:monospace;font-size:10px;color:var(--txtd)">${r.iccid}</td><td style="color:var(--txtd);font-style:italic">${r.pub}</td><td style="color:var(--txtd);font-style:italic">${r.sup}</td><td><span class="badge ${r.st}">${r.lb}</span></td></tr>`;
+  function tpl(r){
+    return '<tr>'
+      + '<td>' + r.id + '</td>'
+      + '<td style="font-size:11px">' + r.cl + '</td>'
+      + '<td>' + r.dest + '</td>'
+      + '<td>' + r.plan + '</td>'
+      + '<td><code>' + r.sid + '</code></td>'
+      + '<td style="font-family:monospace;font-size:10px;color:var(--txtd)">' + r.iccid + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.pub + '</td>'
+      + '<td style="color:var(--txtd);font-style:italic">' + r.sup + '</td>'
+      + '<td><span class="badge ' + r.st + '">' + r.lb + '</span></td>'
+      + '</tr>';
+  }
   const b1=document.getElementById('o-tbody'),b2=document.getElementById('o2-tbody');
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
@@ -416,34 +500,93 @@ function buildOrders(){
 
 function buildPrices(){
   const c=document.getElementById('price-rows');if(!c)return;
-  const items=[
-    {co:'🇯🇵 Japon',pr:'7j · 5 GB',sid:'OCS-JP-001',st:'not_synced'},
-    {co:'🇯🇵 Japon',pr:'7j · 10 GB',sid:'OCS-JP-002',st:'not_synced'},
-    {co:'🇯🇵 Japon',pr:'7j · Illimité',sid:'OCS-JP-003',st:'not_synced'},
-    {co:'🇲🇦 Maroc',pr:'7j · 3 GB',sid:'OCS-MA-001',st:'not_synced'},
-    {co:'🇲🇦 Maroc',pr:'7j · Illimité',sid:'OCS-MA-002',st:'api_error'},
-  ];
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement produits réels…</div></div></div>';
   const sl={not_synced:'b-draft',api_error:'b-err',pending_review:'b-pend',validated:'b-ok'};
   const ll={not_synced:'Non synchronisé',api_error:'Erreur API — prix supprimé',pending_review:'En attente admin',validated:'Validé'};
-  c.innerHTML=items.map(p=>`<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${p.co}</div><div style="width:100px;color:var(--txtm);font-size:12px">${p.pr}</div><div style="flex:1"><code>${p.sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px;font-style:italic">—</div><div style="width:70px;color:var(--txtd);font-size:11px;font-style:italic">—</div><div style="width:120px"><span class="badge ${sl[p.st]}">${ll[p.st]}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" title="Sync">🔄</button><button class="btn btn-sm" disabled style="opacity:.4" title="Valider">✓</button></div></div>`).join('');
+  adminFetch('/products')
+    .then(function(items){
+      if(!Array.isArray(items) || items.length===0){
+        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun produit renvoyé par l’API admin.</div></div></div>';
+        return;
+      }
+      c.innerHTML=items.map(function(p){
+        const st=p.price_status || 'not_synced';
+        const co=(p.country_iso2 || '—');
+        const plan=(p.name || 'Produit');
+        const sid=(p.supplier_id || p.id || '—');
+        const sup=(p.supplier_price!=null)?Number(p.supplier_price).toFixed(2)+'€':'—';
+        const pub=(p.public_price!=null)?Number(p.public_price).toFixed(2)+'€':'—';
+        return `<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${co}</div><div style="width:160px;color:var(--txtm);font-size:12px">${plan}</div><div style="flex:1"><code>${sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px">${sup}</div><div style="width:70px;color:var(--txtd);font-size:11px">${pub}</div><div style="width:120px"><span class="badge ${sl[st]||'b-draft'}">${ll[st]||st}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" onclick="trigSync()" title="Sync">🔄</button></div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div><div class="log-src">Mode démo conservé (données locales)</div></div></div>`;
+    });
 }
 
 function trigSync(){
   if(!confirm('Déclencher une synchronisation API ? Les nouveaux prix seront en statut pending_review.'))return;
-  alert('Sync lancée. Consultez les logs pour le résultat. Les prix avec supplier_price valide passeront en pending_review pour validation admin.');
+  adminFetch('/sync/catalog',{method:'POST'})
+    .then(function(r){
+      alert('Sync lancée ✅ Produits traités: ' + (r.count||0));
+      buildPrices();
+      buildSyncLogs();
+    })
+    .catch(function(err){
+      alert('Erreur sync: ' + err.message);
+    });
 }
 
 function buildSyncLogs(){
   const c=document.getElementById('sync-logs');if(!c)return;
-  const logs=[
-    {t:'12:04:22',col:'var(--green)',m:'Sync OCS démarrée',src:'GET /ocs/catalog/api/cos/COS001/produits'},
-    {t:'12:04:24',col:'var(--green)',m:'342 produits reçus — mapping en cours',src:''},
-    {t:'12:04:25',col:'var(--ora)',m:'5 produits supplier_price=null → statut not_synced',src:'OCS-JP-001, OCS-JP-002, OCS-JP-003, OCS-MA-001, OCS-MA-002'},
-    {t:'12:04:25',col:'var(--red)',m:'ALERTE: OCS-MA-002 (Maroc Illimité 7j) supplier_price=null → prix public retiré du site',src:'OCS-MA-002 · ancien prix 19,90€ supprimé'},
-    {t:'12:04:26',col:'var(--green)',m:'Sync terminée — 337 produits publiés, 5 en not_synced/api_error',src:''},
-  ];
-  c.innerHTML=logs.map(l=>`<div class="log-row"><span class="log-t">${l.t}</span><div class="log-dot" style="background:${l.col}"></div><div><div class="log-msg">${l.m}</div>${l.src?`<div class="log-src">${l.src}</div>`:''}  </div></div>`).join('');
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement logs API…</div></div></div>';
+  adminFetch('/logs')
+    .then(function(logs){
+      if(!Array.isArray(logs) || logs.length===0){
+        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log disponible.</div></div></div>';
+        return;
+      }
+      c.innerHTML=logs.slice(0,20).map(function(l){
+        const t=l.created_at ? new Date(l.created_at).toLocaleTimeString('fr-FR') : '—';
+        const msg=l.message || l.endpoint || 'Log API';
+        const lvl=(l.level || '').toLowerCase();
+        const col=lvl==='error'?'var(--red)':(lvl==='warn'?'var(--ora)':'var(--green)');
+        const src=[l.method,l.endpoint].filter(Boolean).join(' ');
+        return `<div class="log-row"><span class="log-t">${t}</span><div class="log-dot" style="background:${col}"></div><div><div class="log-msg">${msg}</div>${src?`<div class="log-src">${src}</div>`:''}</div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div></div></div>`;
+    });
 }
 
 function buildWHLogs(){
-  const c=document.getElementById('wh-logs')
+  const c=document.getElementById('wh-logs');if(!c)return;
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement webhooks/stripe…</div></div></div>';
+  adminFetch('/logs')
+    .then(function(logs){
+      const filtered=(Array.isArray(logs)?logs:[]).filter(function(l){
+        const m=((l.message||'')+' '+(l.endpoint||'')).toLowerCase();
+        return m.includes('webhook') || m.includes('stripe') || m.includes('/stripe/');
+      }).slice(0,20);
+      if(filtered.length===0){
+        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log Stripe/Webhook pour le moment.</div></div></div>';
+        return;
+      }
+      c.innerHTML=filtered.map(function(l){
+        const t=l.created_at ? new Date(l.created_at).toLocaleTimeString('fr-FR') : '—';
+        const lvl=(l.level || '').toLowerCase();
+        const ok=lvl!=='error';
+        const msg=l.message || l.endpoint || 'Webhook';
+        const src=[l.method,l.endpoint].filter(Boolean).join(' ');
+        return `<div class="log-row"><span class="log-t">${t}</span><div class="log-dot" style="background:${ok?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${msg}</div>${src?`<div class="log-src">${src}</div>`:''}</div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div></div></div>`;
+    });
+}
+
+</script>
+</body>
+</html>
