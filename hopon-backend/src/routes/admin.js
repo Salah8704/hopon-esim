@@ -18,8 +18,31 @@ router.get('/dashboard', optionalAuth, async (req, res) => {
 });
 
 router.get('/orders', optionalAuth, async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 200);
+  const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);
+  const pageSize = Math.min(Math.max(parseInt(req.query.page_size || req.query.limit || '30', 10) || 30, 1), 200);
+  const status = (req.query.status || '').trim();
+  const email = (req.query.email || '').trim().toLowerCase();
   try {
+    const where = [];
+    const params = [];
+    if (status) {
+      params.push(status);
+      where.push(`o.status = $${params.length}`);
+    }
+    if (email) {
+      params.push(`%${email}%`);
+      where.push(`LOWER(o.customer_email) LIKE $${params.length}`);
+    }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const countSql = `SELECT COUNT(*)::int AS total FROM orders o ${whereSql}`;
+    const { rows: countRows } = await db.query(countSql, params);
+    const total = (countRows[0] && countRows[0].total) || 0;
+
+    const offset = (page - 1) * pageSize;
+    params.push(pageSize);
+    params.push(offset);
+
     const { rows } = await db.query(
       `SELECT o.id, o.order_number, o.customer_email, o.status, o.total_price, o.currency,
               o.sim_iccid, o.ocs_subscription_id, o.created_at,
@@ -28,11 +51,19 @@ router.get('/orders', optionalAuth, async (req, res) => {
        FROM orders o
        LEFT JOIN products p ON p.id = o.product_id
        LEFT JOIN countries c ON c.iso2 = o.country_iso2
+       ${whereSql}
        ORDER BY o.created_at DESC
-       LIMIT $1`,
-      [limit]
+       LIMIT $${params.length - 1}
+       OFFSET $${params.length}`,
+      params
     );
-    res.json(rows);
+    res.json({
+      data: rows,
+      page,
+      page_size: pageSize,
+      total,
+      total_pages: Math.max(Math.ceil(total / pageSize), 1)
+    });
   } catch (e) {
     logger.error('[Admin] Orders: ' + e.message);
     res.status(500).json({ error: e.message });

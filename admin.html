@@ -204,10 +204,26 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
       <div class="page" id="p-orders">
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:center">
           <div class="tabs"><div class="tab active">Toutes</div><div class="tab">En attente</div><div class="tab">Activées</div><div class="tab">Erreurs</div></div>
-          <div style="display:flex;gap:8px"><input class="input" style="width:200px" placeholder="Rechercher…"><button class="btn">Export CSV</button></div>
+          <div style="display:flex;gap:8px">
+            <input class="input" id="orders-search" style="width:200px" placeholder="Email client…">
+            <select class="select" id="orders-status" style="width:180px">
+              <option value="">Tous statuts</option>
+              <option value="payment_pending">Paiement en attente</option>
+              <option value="payment_succeeded">Paiement validé</option>
+              <option value="delivery_sent">Livrée</option>
+              <option value="delivery_failed">Échec livraison</option>
+            </select>
+            <button class="btn" onclick="applyOrdersFilters()">Filtrer</button>
+            <button class="btn">Export CSV</button>
+          </div>
         </div>
         <table class="tbl"><thead><tr><th>ID</th><th>Date</th><th>Client</th><th>Destination</th><th>Forfait</th><th>source_product_id</th><th>ICCID</th><th>Prix public</th><th>supplier_price</th><th>Statut</th></tr></thead>
         <tbody id="o2-tbody"></tbody></table>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;align-items:center">
+          <button class="btn btn-sm" onclick="changeOrdersPage(-1)">← Précédent</button>
+          <span id="orders-page-info" style="font-size:12px;color:var(--txtd)">Page 1/1</span>
+          <button class="btn btn-sm" onclick="changeOrdersPage(1)">Suivant →</button>
+        </div>
       </div>
 
       <!-- ESIM STOCK -->
@@ -374,6 +390,7 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
 const ADMIN_AUTH_KEY='hopon_admin_auth';
 const ADMIN_SECRET_KEY='hopon_admin_secret';
 const ADMIN_API_BASE=(location.origin||'') + '/api/v1/admin';
+const ORDER_STATE={ page:1, totalPages:1, status:'', email:'', pageSize:30 };
 
 function getAdminSecret(){
   try{ return (localStorage.getItem(ADMIN_SECRET_KEY)||'').trim(); }catch(e){ return ''; }
@@ -497,9 +514,24 @@ function buildOrders(){
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
 
-  adminFetch('/orders?limit=30')
-    .then(function(items){
-      if(!Array.isArray(items) || items.length===0) return;
+  const qs=new URLSearchParams({
+    page:String(ORDER_STATE.page),
+    page_size:String(ORDER_STATE.pageSize)
+  });
+  if(ORDER_STATE.status) qs.set('status', ORDER_STATE.status);
+  if(ORDER_STATE.email) qs.set('email', ORDER_STATE.email);
+
+  adminFetch('/orders?' + qs.toString())
+    .then(function(payload){
+      const items = Array.isArray(payload) ? payload : (payload.data || []);
+      ORDER_STATE.totalPages = (payload && payload.total_pages) ? payload.total_pages : 1;
+      const pageInfo=document.getElementById('orders-page-info');
+      if(pageInfo) pageInfo.textContent='Page ' + ORDER_STATE.page + '/' + ORDER_STATE.totalPages;
+      if(!Array.isArray(items) || items.length===0){
+        if(b1)b1.innerHTML='';
+        if(b2)b2.innerHTML='<tr><td colspan="10" style="color:var(--txtd)">Aucune commande trouvée.</td></tr>';
+        return;
+      }
       const statusMap={
         delivery_sent:{c:'b-ok',l:'Livrée'},
         payment_succeeded:{c:'b-sync',l:'Payée'},
@@ -526,6 +558,22 @@ function buildOrders(){
       if(b2)b2.innerHTML=mapped.map(tpl).join('');
     })
     .catch(function(){});
+}
+
+function applyOrdersFilters(){
+  const emailInput=document.getElementById('orders-search');
+  const statusInput=document.getElementById('orders-status');
+  ORDER_STATE.email=(emailInput && emailInput.value ? emailInput.value.trim() : '');
+  ORDER_STATE.status=(statusInput && statusInput.value ? statusInput.value : '');
+  ORDER_STATE.page=1;
+  buildOrders();
+}
+
+function changeOrdersPage(delta){
+  const next=ORDER_STATE.page + Number(delta||0);
+  if(next<1 || next>ORDER_STATE.totalPages) return;
+  ORDER_STATE.page=next;
+  buildOrders();
 }
 
 function buildPrices(){
