@@ -204,10 +204,26 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
       <div class="page" id="p-orders">
         <div style="display:flex;justify-content:space-between;margin-bottom:16px;align-items:center">
           <div class="tabs"><div class="tab active">Toutes</div><div class="tab">En attente</div><div class="tab">Activées</div><div class="tab">Erreurs</div></div>
-          <div style="display:flex;gap:8px"><input class="input" style="width:200px" placeholder="Rechercher…"><button class="btn">Export CSV</button></div>
+          <div style="display:flex;gap:8px">
+            <input class="input" id="orders-search" style="width:200px" placeholder="Email client…">
+            <select class="select" id="orders-status" style="width:180px">
+              <option value="">Tous statuts</option>
+              <option value="payment_pending">Paiement en attente</option>
+              <option value="payment_succeeded">Paiement validé</option>
+              <option value="delivery_sent">Livrée</option>
+              <option value="delivery_failed">Échec livraison</option>
+            </select>
+            <button class="btn" onclick="applyOrdersFilters()">Filtrer</button>
+            <button class="btn">Export CSV</button>
+          </div>
         </div>
         <table class="tbl"><thead><tr><th>ID</th><th>Date</th><th>Client</th><th>Destination</th><th>Forfait</th><th>source_product_id</th><th>ICCID</th><th>Prix public</th><th>supplier_price</th><th>Statut</th></tr></thead>
         <tbody id="o2-tbody"></tbody></table>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;align-items:center">
+          <button class="btn btn-sm" onclick="changeOrdersPage(-1)">← Précédent</button>
+          <span id="orders-page-info" style="font-size:12px;color:var(--txtd)">Page 1/1</span>
+          <button class="btn btn-sm" onclick="changeOrdersPage(1)">Suivant →</button>
+        </div>
       </div>
 
       <!-- ESIM STOCK -->
@@ -372,6 +388,34 @@ code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:10px;colo
 
 <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 const ADMIN_AUTH_KEY='hopon_admin_auth';
+const ADMIN_SECRET_KEY='hopon_admin_secret';
+const ADMIN_API_BASE=(location.origin||'') + '/api/v1/admin';
+const ORDER_STATE={ page:1, totalPages:1, status:'', email:'', pageSize:30 };
+
+function getAdminSecret(){
+  try{ return (localStorage.getItem(ADMIN_SECRET_KEY)||'').trim(); }catch(e){ return ''; }
+}
+
+async function adminFetch(path, options){
+  const opts=options||{};
+  const headers=Object.assign({}, opts.headers||{});
+  const secret=getAdminSecret();
+  if(secret) headers['x-admin-secret']=secret;
+  const res=await fetch(ADMIN_API_BASE + path, Object.assign({}, opts, {headers}));
+  if(res.status===401){
+    const entered=prompt('Secret admin requis (ADMIN_SECRET). Laisser vide si non configuré :','');
+    if(entered!==null){
+      try{ localStorage.setItem(ADMIN_SECRET_KEY, entered.trim()); }catch(e){}
+      return adminFetch(path, options);
+    }
+  }
+  if(!res.ok){
+    let msg='Erreur API admin';
+    try{ const j=await res.json(); if(j && j.error) msg=j.error; }catch(e){}
+    throw new Error(msg);
+  }
+  return res.json();
+}
 
 function getAdminCredentials(){
   const defaultCreds={u:'admin',p:'hopon2025'};
@@ -449,9 +493,9 @@ function buildAll(){buildOrders();buildPrices();buildSyncLogs();buildWHLogs();}
 
 function buildOrders(){
   const rows=[
-    {id:'#4821',cl:'thomas.l@email.com',dest:'🇯🇵 Japon',plan:'7j·10GB',sid:'OCS-JP-002',iccid:'8940..4821',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
-    {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
-    {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Brouillon'},
+    {id:'#4821',cl:'thomas.l@email.com',dest:'🇯🇵 Japon',plan:'7j·10GB',sid:'OCS-JP-002',iccid:'8940..4821',pub:'—',sup:'—',st:'b-pend',lb:'Démo'},
+    {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Démo'},
+    {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Démo'},
   ];
   function tpl(r){
     return '<tr>'
@@ -469,48 +513,219 @@ function buildOrders(){
   const b1=document.getElementById('o-tbody'),b2=document.getElementById('o2-tbody');
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
+
+  const qs=new URLSearchParams({
+    page:String(ORDER_STATE.page),
+    page_size:String(ORDER_STATE.pageSize)
+  });
+  if(ORDER_STATE.status) qs.set('status', ORDER_STATE.status);
+  if(ORDER_STATE.email) qs.set('email', ORDER_STATE.email);
+
+  adminFetch('/orders?' + qs.toString())
+    .then(function(payload){
+      const items = Array.isArray(payload) ? payload : (payload.data || []);
+      ORDER_STATE.totalPages = (payload && payload.total_pages) ? payload.total_pages : 1;
+      const pageInfo=document.getElementById('orders-page-info');
+      if(pageInfo) pageInfo.textContent='Page ' + ORDER_STATE.page + '/' + ORDER_STATE.totalPages;
+      if(!Array.isArray(items) || items.length===0){
+        if(b1)b1.innerHTML='';
+        if(b2)b2.innerHTML='<tr><td colspan="10" style="color:var(--txtd)">Aucune commande trouvée.</td></tr>';
+        return;
+      }
+      const statusMap={
+        delivery_sent:{c:'b-ok',l:'Livrée'},
+        payment_succeeded:{c:'b-sync',l:'Payée'},
+        payment_pending:{c:'b-pend',l:'Paiement en attente'},
+        delivery_failed:{c:'b-err',l:'Échec livraison'}
+      };
+      const mapped=items.map(function(o){
+        const s=statusMap[o.status] || {c:'b-draft',l:o.status||'—'};
+        const orderId=o.order_number || (o.id ? String(o.id).slice(0,8) : '—');
+        return {
+          id:orderId,
+          cl:o.customer_email || '—',
+          dest:((o.flag_emoji||'🌍') + ' ' + (o.country_name||'Destination')),
+          plan:o.product_name || 'Produit',
+          sid:o.ocs_subscription_id || '—',
+          iccid:o.sim_iccid || '—',
+          pub:(o.total_price!=null ? Number(o.total_price).toFixed(2)+' '+(o.currency||'EUR') : '—'),
+          sup:'—',
+          st:s.c,
+          lb:s.l
+        };
+      });
+      if(b1)b1.innerHTML=mapped.map(tpl).join('');
+      if(b2)b2.innerHTML=mapped.map(tpl).join('');
+    })
+    .catch(function(){});
+}
+
+function applyOrdersFilters(){
+  const emailInput=document.getElementById('orders-search');
+  const statusInput=document.getElementById('orders-status');
+  ORDER_STATE.email=(emailInput && emailInput.value ? emailInput.value.trim() : '');
+  ORDER_STATE.status=(statusInput && statusInput.value ? statusInput.value : '');
+  ORDER_STATE.page=1;
+  buildOrders();
+}
+
+function changeOrdersPage(delta){
+  const next=ORDER_STATE.page + Number(delta||0);
+  if(next<1 || next>ORDER_STATE.totalPages) return;
+  ORDER_STATE.page=next;
+  buildOrders();
 }
 
 function buildPrices(){
   const c=document.getElementById('price-rows');if(!c)return;
-  const items=[
-    {co:'🇯🇵 Japon',pr:'7j · 5 GB',sid:'OCS-JP-001',st:'not_synced'},
-    {co:'🇯🇵 Japon',pr:'7j · 10 GB',sid:'OCS-JP-002',st:'not_synced'},
-    {co:'🇯🇵 Japon',pr:'7j · Illimité',sid:'OCS-JP-003',st:'not_synced'},
-    {co:'🇲🇦 Maroc',pr:'7j · 3 GB',sid:'OCS-MA-001',st:'not_synced'},
-    {co:'🇲🇦 Maroc',pr:'7j · Illimité',sid:'OCS-MA-002',st:'api_error'},
-  ];
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement produits réels…</div></div></div>';
   const sl={not_synced:'b-draft',api_error:'b-err',pending_review:'b-pend',validated:'b-ok'};
   const ll={not_synced:'Non synchronisé',api_error:'Erreur API — prix supprimé',pending_review:'En attente admin',validated:'Validé'};
-  c.innerHTML=items.map(p=>`<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${p.co}</div><div style="width:100px;color:var(--txtm);font-size:12px">${p.pr}</div><div style="flex:1"><code>${p.sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px;font-style:italic">—</div><div style="width:70px;color:var(--txtd);font-size:11px;font-style:italic">—</div><div style="width:120px"><span class="badge ${sl[p.st]}">${ll[p.st]}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" title="Sync">🔄</button><button class="btn btn-sm" disabled style="opacity:.4" title="Valider">✓</button></div></div>`).join('');
+  adminFetch('/products')
+    .then(function(items){
+      if(!Array.isArray(items) || items.length===0){
+        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun produit renvoyé par l’API admin.</div></div></div>';
+        return;
+      }
+      c.innerHTML=items.map(function(p){
+        const st=p.price_status || 'not_synced';
+        const co=(p.country_iso2 || '—');
+        const plan=(p.name || 'Produit');
+        const sid=(p.supplier_id || p.id || '—');
+        const sup=(p.supplier_price!=null)?Number(p.supplier_price).toFixed(2)+'€':'—';
+        const pub=(p.public_price!=null)?Number(p.public_price).toFixed(2)+'€':'—';
+        const canValidate=Boolean(p.id);
+        const inputId='pub-price-' + p.id;
+        const inputPrice=canValidate
+          ? `<input id="${inputId}" type="number" step="0.01" min="0" value="${p.public_price!=null?Number(p.public_price).toFixed(2):''}" placeholder="Prix €" style="width:80px;background:#111827;border:1px solid #374151;color:#e5e7eb;border-radius:8px;padding:4px 6px;font-size:11px">`
+          : `<input type="number" disabled placeholder="Prix €" style="width:80px;opacity:.4">`;
+        const validateBtn=canValidate
+          ? `<button class="btn btn-sm" onclick="validatePublicPrice('${p.id}', '${inputId}')" title="Valider prix">✓</button>`
+          : `<button class="btn btn-sm" disabled style="opacity:.4" title="ID produit manquant">✓</button>`;
+        const publishBtn=canValidate
+          ? `<button class="btn btn-sm" onclick="toggleProductPublish('${p.id}', ${p.is_published?'false':'true'})" title="${p.is_published?'Dépublier':'Publier'}">${p.is_published?'⏸':'🚀'}</button>`
+          : '';
+        return `<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${co}</div><div style="width:160px;color:var(--txtm);font-size:12px">${plan}</div><div style="flex:1"><code>${sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px">${sup}</div><div style="width:70px;color:var(--txtd);font-size:11px">${pub}</div><div style="width:120px"><span class="badge ${sl[st]||'b-draft'}">${ll[st]||st}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" onclick="trigSync()" title="Sync">🔄</button>${inputPrice}${validateBtn}${publishBtn}</div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div><div class="log-src">Mode démo conservé (données locales)</div></div></div>`;
+    });
+}
+
+function validatePublicPrice(productId, inputId){
+  const input=document.getElementById(inputId);
+  const raw=input ? input.value : '';
+  const value=Number(String(raw).replace(',', '.'));
+  if(!Number.isFinite(value) || value<=0){
+    alert('Prix invalide. Entrez un nombre > 0');
+    return;
+  }
+  adminFetch('/products/' + encodeURIComponent(productId) + '/validate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ public_price:value })
+  })
+    .then(function(){
+      alert('Prix validé ✅');
+      buildPrices();
+      buildSyncLogs();
+    })
+    .catch(function(err){
+      alert('Validation impossible: ' + err.message);
+    });
+}
+
+function toggleProductPublish(productId, publish){
+  const action=publish?'publier':'dépublier';
+  if(!confirm('Confirmer: ' + action + ' ce produit ?')) return;
+  adminFetch('/products/' + encodeURIComponent(productId) + '/publish', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ is_published: Boolean(publish) })
+  })
+    .then(function(){
+      alert('Produit mis à jour ✅');
+      buildPrices();
+      buildSyncLogs();
+    })
+    .catch(function(err){
+      alert('Publication impossible: ' + err.message);
+    });
 }
 
 function trigSync(){
   if(!confirm('Déclencher une synchronisation API ? Les nouveaux prix seront en statut pending_review.'))return;
-  alert('Sync lancée. Consultez les logs pour le résultat. Les prix avec supplier_price valide passeront en pending_review pour validation admin.');
+  adminFetch('/sync/catalog',{method:'POST'})
+    .then(function(r){
+      alert('Sync lancée ✅ Produits traités: ' + (r.count||0));
+      buildPrices();
+      buildSyncLogs();
+    })
+    .catch(function(err){
+      alert('Erreur sync: ' + err.message);
+    });
 }
 
 function buildSyncLogs(){
   const c=document.getElementById('sync-logs');if(!c)return;
-  const logs=[
-    {t:'12:04:22',col:'var(--green)',m:'Sync OCS démarrée',src:'GET /ocs/catalog/api/cos/COS001/produits'},
-    {t:'12:04:24',col:'var(--green)',m:'342 produits reçus — mapping en cours',src:''},
-    {t:'12:04:25',col:'var(--ora)',m:'5 produits supplier_price=null → statut not_synced',src:'OCS-JP-001, OCS-JP-002, OCS-JP-003, OCS-MA-001, OCS-MA-002'},
-    {t:'12:04:25',col:'var(--red)',m:'ALERTE: OCS-MA-002 (Maroc Illimité 7j) supplier_price=null → prix public retiré du site',src:'OCS-MA-002 · ancien prix 19,90€ supprimé'},
-    {t:'12:04:26',col:'var(--green)',m:'Sync terminée — 337 produits publiés, 5 en not_synced/api_error',src:''},
-  ];
-  c.innerHTML=logs.map(l=>`<div class="log-row"><span class="log-t">${l.t}</span><div class="log-dot" style="background:${l.col}"></div><div><div class="log-msg">${l.m}</div>${l.src?`<div class="log-src">${l.src}</div>`:''}  </div></div>`).join('');
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement logs API…</div></div></div>';
+  adminFetch('/logs')
+    .then(function(logs){
+      if(!Array.isArray(logs) || logs.length===0){
+        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log disponible.</div></div></div>';
+        return;
+      }
+      c.innerHTML=logs.slice(0,20).map(function(l){
+        const t=l.created_at ? new Date(l.created_at).toLocaleTimeString('fr-FR') : '—';
+        const msg=l.message || l.endpoint || 'Log API';
+        const lvl=(l.level || '').toLowerCase();
+        const col=lvl==='error'?'var(--red)':(lvl==='warn'?'var(--ora)':'var(--green)');
+        const src=[l.method,l.endpoint].filter(Boolean).join(' ');
+        return `<div class="log-row"><span class="log-t">${t}</span><div class="log-dot" style="background:${col}"></div><div><div class="log-msg">${msg}</div>${src?`<div class="log-src">${src}</div>`:''}</div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div></div></div>`;
+    });
 }
 
 function buildWHLogs(){
   const c=document.getElementById('wh-logs');if(!c)return;
-  const logs=[
-    {t:'12:10:01',ok:true,m:'Webhook order.created reçu',src:'woo#4821 · statut pending'},
-    {t:'12:10:03',ok:true,m:'Webhook payment.succeeded reçu',src:'woo#4821 · Stripe PI confirmé'},
-    {t:'12:10:04',ok:true,m:'Webhook esim.provisioned envoyé',src:'OCS-JP-002 · ICCID 8940..4821'},
-    {t:'12:10:05',ok:false,m:'Webhook partner.notify en échec',src:'Tentative 1/3 · timeout fournisseur'}
-  ];
-  c.innerHTML=logs.map(l=>`<div class="log-row"><span class="log-t">${l.t}</span><div class="log-dot" style="background:${l.ok?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${l.m}</div>${l.src?`<div class="log-src">${l.src}</div>`:''}</div></div>`).join('');
+  c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement webhooks/stripe…</div></div></div>';
+  Promise.all([
+    adminFetch('/stripe/status').catch(function(){ return null; }),
+    adminFetch('/logs').catch(function(){ return []; })
+  ])
+    .then(function(resAll){
+      const stripe=resAll[0];
+      const logs=resAll[1];
+      let prefix='';
+      if(stripe){
+        const dot=stripe.configured?'🟢':'🔴';
+        const wh=stripe.webhook_configured?'webhook OK':'webhook manquant';
+        prefix=`<div class="log-row"><span class="log-t">Stripe</span><div class="log-dot" style="background:${stripe.configured?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${dot} Configuration Stripe: ${stripe.configured?'active':'absente'}</div><div class="log-src">${wh}</div></div></div>`;
+      }
+      const filtered=(Array.isArray(logs)?logs:[]).filter(function(l){
+        const m=((l.message||'')+' '+(l.endpoint||'')).toLowerCase();
+        return m.includes('webhook') || m.includes('stripe') || m.includes('/stripe/');
+      }).slice(0,20);
+      if(filtered.length===0){
+        c.innerHTML=prefix + '<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log Stripe/Webhook pour le moment.</div></div></div>';
+        return;
+      }
+      c.innerHTML=prefix + filtered.map(function(l){
+        const t=l.created_at ? new Date(l.created_at).toLocaleTimeString('fr-FR') : '—';
+        const lvl=(l.level || '').toLowerCase();
+        const ok=lvl!=='error';
+        const msg=l.message || l.endpoint || 'Webhook';
+        const src=[l.method,l.endpoint].filter(Boolean).join(' ');
+        return `<div class="log-row"><span class="log-t">${t}</span><div class="log-dot" style="background:${ok?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${msg}</div>${src?`<div class="log-src">${src}</div>`:''}</div></div>`;
+      }).join('');
+    })
+    .catch(function(err){
+      c.innerHTML=`<div class="log-row"><span class="log-t">⚠️</span><div><div class="log-msg">${err.message}</div></div></div>`;
+    });
 }
 
 </script>
