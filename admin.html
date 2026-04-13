@@ -547,10 +547,17 @@ function buildPrices(){
         const sup=(p.supplier_price!=null)?Number(p.supplier_price).toFixed(2)+'€':'—';
         const pub=(p.public_price!=null)?Number(p.public_price).toFixed(2)+'€':'—';
         const canValidate=Boolean(p.id);
+        const inputId='pub-price-' + p.id;
+        const inputPrice=canValidate
+          ? `<input id="${inputId}" type="number" step="0.01" min="0" value="${p.public_price!=null?Number(p.public_price).toFixed(2):''}" placeholder="Prix €" style="width:80px;background:#111827;border:1px solid #374151;color:#e5e7eb;border-radius:8px;padding:4px 6px;font-size:11px">`
+          : `<input type="number" disabled placeholder="Prix €" style="width:80px;opacity:.4">`;
         const validateBtn=canValidate
-          ? `<button class="btn btn-sm" onclick="validatePublicPrice('${p.id}', ${p.public_price!=null?Number(p.public_price):'null'})" title="Valider prix">✓</button>`
+          ? `<button class="btn btn-sm" onclick="validatePublicPrice('${p.id}', '${inputId}')" title="Valider prix">✓</button>`
           : `<button class="btn btn-sm" disabled style="opacity:.4" title="ID produit manquant">✓</button>`;
-        return `<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${co}</div><div style="width:160px;color:var(--txtm);font-size:12px">${plan}</div><div style="flex:1"><code>${sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px">${sup}</div><div style="width:70px;color:var(--txtd);font-size:11px">${pub}</div><div style="width:120px"><span class="badge ${sl[st]||'b-draft'}">${ll[st]||st}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" onclick="trigSync()" title="Sync">🔄</button>${validateBtn}</div></div>`;
+        const publishBtn=canValidate
+          ? `<button class="btn btn-sm" onclick="toggleProductPublish('${p.id}', ${p.is_published?'false':'true'})" title="${p.is_published?'Dépublier':'Publier'}">${p.is_published?'⏸':'🚀'}</button>`
+          : '';
+        return `<div class="pval-row"><div style="width:80px;color:var(--txt);font-size:12px">${co}</div><div style="width:160px;color:var(--txtm);font-size:12px">${plan}</div><div style="flex:1"><code>${sid}</code></div><div style="width:60px;color:var(--txtd);font-size:11px">${sup}</div><div style="width:70px;color:var(--txtd);font-size:11px">${pub}</div><div style="width:120px"><span class="badge ${sl[st]||'b-draft'}">${ll[st]||st}</span></div><div style="display:flex;gap:4px"><button class="btn btn-blue btn-sm" onclick="trigSync()" title="Sync">🔄</button>${inputPrice}${validateBtn}${publishBtn}</div></div>`;
       }).join('');
     })
     .catch(function(err){
@@ -558,11 +565,10 @@ function buildPrices(){
     });
 }
 
-function validatePublicPrice(productId, currentPrice){
-  const seed=(currentPrice!=null && !Number.isNaN(currentPrice)) ? String(currentPrice) : '';
-  const entered=prompt('Prix public à valider (ex: 19.90)', seed);
-  if(entered===null) return;
-  const value=Number(String(entered).replace(',', '.'));
+function validatePublicPrice(productId, inputId){
+  const input=document.getElementById(inputId);
+  const raw=input ? input.value : '';
+  const value=Number(String(raw).replace(',', '.'));
   if(!Number.isFinite(value) || value<=0){
     alert('Prix invalide. Entrez un nombre > 0');
     return;
@@ -579,6 +585,24 @@ function validatePublicPrice(productId, currentPrice){
     })
     .catch(function(err){
       alert('Validation impossible: ' + err.message);
+    });
+}
+
+function toggleProductPublish(productId, publish){
+  const action=publish?'publier':'dépublier';
+  if(!confirm('Confirmer: ' + action + ' ce produit ?')) return;
+  adminFetch('/products/' + encodeURIComponent(productId) + '/publish', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ is_published: Boolean(publish) })
+  })
+    .then(function(){
+      alert('Produit mis à jour ✅');
+      buildPrices();
+      buildSyncLogs();
+    })
+    .catch(function(err){
+      alert('Publication impossible: ' + err.message);
     });
 }
 

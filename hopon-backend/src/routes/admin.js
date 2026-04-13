@@ -85,6 +85,19 @@ router.post('/products/:id/validate', optionalAuth, async (req, res) => {
   }
 });
 
+router.post('/products/:id/publish', optionalAuth, async (req, res) => {
+  const isPublished = Boolean(req.body && req.body.is_published);
+  try {
+    await db.query(
+      'UPDATE products SET is_published=$1, updated_at=NOW() WHERE id=$2',
+      [isPublished, req.params.id]
+    );
+    res.json({ success: true, is_published: isPublished });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.get('/logs', optionalAuth, async (req, res) => {
   const { rows } = await db.query('SELECT * FROM api_logs ORDER BY created_at DESC LIMIT 50').catch(() => ({ rows: [] }));
   res.json(rows);
