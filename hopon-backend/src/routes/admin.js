@@ -17,6 +17,38 @@ router.get('/dashboard', optionalAuth, async (req, res) => {
   res.json({ ts: new Date().toISOString() });
 });
 
+router.get('/orders', optionalAuth, async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit || '50', 10) || 50, 200);
+  try {
+    const { rows } = await db.query(
+      `SELECT o.id, o.order_number, o.customer_email, o.status, o.total_price, o.currency,
+              o.sim_iccid, o.ocs_subscription_id, o.created_at,
+              p.name AS product_name,
+              c.name_fr AS country_name, c.flag_emoji
+       FROM orders o
+       LEFT JOIN products p ON p.id = o.product_id
+       LEFT JOIN countries c ON c.iso2 = o.country_iso2
+       ORDER BY o.created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(rows);
+  } catch (e) {
+    logger.error('[Admin] Orders: ' + e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.get('/stripe/status', optionalAuth, async (req, res) => {
+  const key = process.env.STRIPE_SECRET_KEY || '';
+  const webhook = process.env.STRIPE_WEBHOOK_SECRET || '';
+  res.json({
+    configured: Boolean(key && !key.includes('REMPLACER')),
+    webhook_configured: Boolean(webhook && !webhook.includes('REMPLACER')),
+    ts: new Date().toISOString()
+  });
+});
+
 router.post('/sync/catalog', optionalAuth, async (req, res) => {
   logger.info('[Admin] Sync catalogue');
   if (!process.env.OCS_USERNAME || !process.env.OCS_PASSWORD) {

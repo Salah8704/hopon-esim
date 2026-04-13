@@ -476,9 +476,9 @@ function buildAll(){buildOrders();buildPrices();buildSyncLogs();buildWHLogs();}
 
 function buildOrders(){
   const rows=[
-    {id:'#4821',cl:'thomas.l@email.com',dest:'🇯🇵 Japon',plan:'7j·10GB',sid:'OCS-JP-002',iccid:'8940..4821',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
-    {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Non sync'},
-    {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Brouillon'},
+    {id:'#4821',cl:'thomas.l@email.com',dest:'🇯🇵 Japon',plan:'7j·10GB',sid:'OCS-JP-002',iccid:'8940..4821',pub:'—',sup:'—',st:'b-pend',lb:'Démo'},
+    {id:'#4820',cl:'marie.d@acme.fr',dest:'🇺🇸 USA',plan:'14j·Illimité',sid:'OCS-US-004',iccid:'—',pub:'—',sup:'—',st:'b-pend',lb:'Démo'},
+    {id:'#4819',cl:'lucas.b@email.com',dest:'🇲🇦 Maroc',plan:'7j·3GB',sid:'OCS-MA-001',iccid:'—',pub:'—',sup:'—',st:'b-draft',lb:'Démo'},
   ];
   function tpl(r){
     return '<tr>'
@@ -496,6 +496,36 @@ function buildOrders(){
   const b1=document.getElementById('o-tbody'),b2=document.getElementById('o2-tbody');
   if(b1)b1.innerHTML=rows.map(tpl).join('');
   if(b2)b2.innerHTML=rows.map(tpl).join('');
+
+  adminFetch('/orders?limit=30')
+    .then(function(items){
+      if(!Array.isArray(items) || items.length===0) return;
+      const statusMap={
+        delivery_sent:{c:'b-ok',l:'Livrée'},
+        payment_succeeded:{c:'b-sync',l:'Payée'},
+        payment_pending:{c:'b-pend',l:'Paiement en attente'},
+        delivery_failed:{c:'b-err',l:'Échec livraison'}
+      };
+      const mapped=items.map(function(o){
+        const s=statusMap[o.status] || {c:'b-draft',l:o.status||'—'};
+        const orderId=o.order_number || (o.id ? String(o.id).slice(0,8) : '—');
+        return {
+          id:orderId,
+          cl:o.customer_email || '—',
+          dest:((o.flag_emoji||'🌍') + ' ' + (o.country_name||'Destination')),
+          plan:o.product_name || 'Produit',
+          sid:o.ocs_subscription_id || '—',
+          iccid:o.sim_iccid || '—',
+          pub:(o.total_price!=null ? Number(o.total_price).toFixed(2)+' '+(o.currency||'EUR') : '—'),
+          sup:'—',
+          st:s.c,
+          lb:s.l
+        };
+      });
+      if(b1)b1.innerHTML=mapped.map(tpl).join('');
+      if(b2)b2.innerHTML=mapped.map(tpl).join('');
+    })
+    .catch(function(){});
 }
 
 function buildPrices(){
@@ -563,17 +593,28 @@ function buildSyncLogs(){
 function buildWHLogs(){
   const c=document.getElementById('wh-logs');if(!c)return;
   c.innerHTML='<div class="log-row"><span class="log-t">…</span><div><div class="log-msg">Chargement webhooks/stripe…</div></div></div>';
-  adminFetch('/logs')
-    .then(function(logs){
+  Promise.all([
+    adminFetch('/stripe/status').catch(function(){ return null; }),
+    adminFetch('/logs').catch(function(){ return []; })
+  ])
+    .then(function(resAll){
+      const stripe=resAll[0];
+      const logs=resAll[1];
+      let prefix='';
+      if(stripe){
+        const dot=stripe.configured?'🟢':'🔴';
+        const wh=stripe.webhook_configured?'webhook OK':'webhook manquant';
+        prefix=`<div class="log-row"><span class="log-t">Stripe</span><div class="log-dot" style="background:${stripe.configured?'var(--green)':'var(--red)'}"></div><div><div class="log-msg">${dot} Configuration Stripe: ${stripe.configured?'active':'absente'}</div><div class="log-src">${wh}</div></div></div>`;
+      }
       const filtered=(Array.isArray(logs)?logs:[]).filter(function(l){
         const m=((l.message||'')+' '+(l.endpoint||'')).toLowerCase();
         return m.includes('webhook') || m.includes('stripe') || m.includes('/stripe/');
       }).slice(0,20);
       if(filtered.length===0){
-        c.innerHTML='<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log Stripe/Webhook pour le moment.</div></div></div>';
+        c.innerHTML=prefix + '<div class="log-row"><span class="log-t">—</span><div><div class="log-msg">Aucun log Stripe/Webhook pour le moment.</div></div></div>';
         return;
       }
-      c.innerHTML=filtered.map(function(l){
+      c.innerHTML=prefix + filtered.map(function(l){
         const t=l.created_at ? new Date(l.created_at).toLocaleTimeString('fr-FR') : '—';
         const lvl=(l.level || '').toLowerCase();
         const ok=lvl!=='error';
