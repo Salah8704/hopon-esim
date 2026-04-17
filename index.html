@@ -870,12 +870,12 @@ html{overflow-x:hidden;max-width:100vw}
     <div class="contact-form">
       <h3>Envoyez-nous<br>un message</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="form-g"><label class="form-l">Prénom</label><input type="text" class="form-i" placeholder="Jean"></div>
-        <div class="form-g"><label class="form-l">Nom</label><input type="text" class="form-i" placeholder="Dupont"></div>
+        <div class="form-g"><label class="form-l">Prénom</label><input type="text" class="form-i" id="contact-first-name" placeholder="Jean"></div>
+        <div class="form-g"><label class="form-l">Nom</label><input type="text" class="form-i" id="contact-last-name" placeholder="Dupont"></div>
       </div>
-      <div class="form-g"><label class="form-l">Email</label><input type="email" class="form-i" placeholder="jean@entreprise.fr"></div>
-      <div class="form-g"><label class="form-l">Sujet</label><select class="form-select"><option>Demande générale</option><option>hopOn Pro — devis équipe</option><option>Partenariat / API</option><option>Support technique</option><option>Presse / médias</option></select></div>
-      <div class="form-g"><label class="form-l">Message</label><textarea class="form-i" placeholder="Dites-nous comment nous pouvons vous aider…"></textarea></div>
+      <div class="form-g"><label class="form-l">Email</label><input type="email" class="form-i" id="contact-email" placeholder="jean@entreprise.fr"></div>
+      <div class="form-g"><label class="form-l">Sujet</label><select class="form-select" id="contact-subject"><option>Demande générale</option><option>hopOn Pro — devis équipe</option><option>Partenariat / API</option><option>Support technique</option><option>Presse / médias</option></select></div>
+      <div class="form-g"><label class="form-l">Message</label><textarea class="form-i" id="contact-message" placeholder="Dites-nous comment nous pouvons vous aider…"></textarea></div>
       <button class="btn-cta" style="width:100%;padding:13px;border-radius:9px;font-size:14px" onclick="sendContact()">Envoyer →</button>
     </div>
   </div>
@@ -1792,7 +1792,44 @@ async function processPay(){
     btn.disabled = false;
   }
 }
-function sendContact(){alert('Message envoyé ! Notre équipe vous répondra sous 24h à contact@hopon.fr');}
+async function sendContact(){
+  var firstName=(document.getElementById('contact-first-name')||{}).value||'';
+  var lastName=(document.getElementById('contact-last-name')||{}).value||'';
+  var email=(document.getElementById('contact-email')||{}).value||'';
+  var subject=(document.getElementById('contact-subject')||{}).value||'Demande générale';
+  var message=(document.getElementById('contact-message')||{}).value||'';
+
+  if(!firstName.trim() || !email.trim() || !message.trim()){
+    showToast('Prénom, email et message sont obligatoires.', 'error');
+    return;
+  }
+  if(!/.+@.+\..+/.test(email)){
+    showToast('Email invalide.', 'error');
+    return;
+  }
+
+  try{
+    var resp=await fetch(API_BASE + '/api/v1/contact', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        first_name:firstName.trim(),
+        last_name:lastName.trim(),
+        email:email.trim(),
+        subject:subject,
+        message:message.trim()
+      })
+    });
+    if(!resp.ok){
+      var err=await resp.json().catch(function(){return {};});
+      throw new Error(err.error || ('HTTP '+resp.status));
+    }
+    showToast('Message envoyé ✅ Nous revenons vers vous sous 24h.', 'ok');
+    (document.getElementById('contact-message')||{}).value='';
+  }catch(e){
+    showToast('Envoi impossible: ' + e.message, 'error');
+  }
+}
 
 // ── PARTNER / AFFILIATE SYSTEM ─────────────────────────────────────────────────
 const PARTNER = {id:null, code:null, source:null};

@@ -241,6 +241,25 @@ async function sendAdminAlert({ subject, message, orderId }) {
   await _send({ to: adminEmail, subject: `[ALERT] ${subject}`, html });
 }
 
+async function sendContactMessage({ firstName, lastName, fromEmail, subject, message }) {
+  const to = process.env.CONTACT_RECEIVER_EMAIL || process.env.EMAIL_FROM_ADDRESS || 'contact@hopon.fr';
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || 'Visiteur';
+  const safeSubject = subject || 'Demande générale';
+  const html = `
+    <h2>Nouveau message depuis hopon.fr</h2>
+    <p><strong>Nom:</strong> ${fullName}</p>
+    <p><strong>Email:</strong> ${fromEmail}</p>
+    <p><strong>Sujet:</strong> ${safeSubject}</p>
+    <p><strong>Message:</strong></p>
+    <p>${String(message || '').replace(/\n/g, '<br>')}</p>
+  `;
+  await _send({
+    to,
+    subject: `[Contact] ${safeSubject}`,
+    html
+  });
+}
+
 async function _send({ to, subject, html }) {
   const transport = getTransport();
   await transport.sendMail({
@@ -253,4 +272,5 @@ module.exports = {
   sendEsimDelivery,
   sendOrderConfirmation,
   sendAdminAlert,
+  sendContactMessage,
 };
