@@ -34,7 +34,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
     // Vérifier accès : soit admin, soit email correspondant
     const email = req.query.email || req.user?.email;
-    if (!req.user?.role === 'admin' && order.customer_email !== email) {
+    if (req.user?.role !== 'admin' && order.customer_email !== email) {
       return res.status(403).json({ error: 'Accès refusé' });
     }
 
