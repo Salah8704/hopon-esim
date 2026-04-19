@@ -112,6 +112,7 @@ app.post('/api/v1/admin/sync/catalog', async (req, res) => {
 
 // ─── Routes standard ────────────────────────────────────────────
 try {
+  app.use('/api/v1/admin',    require('./routes/admin-auth'));
   app.use('/api/v1/admin',    require('./routes/admin'));
   app.use('/api/v1/catalog',  require('./routes/catalog'));
   app.use('/api/v1/contact',  require('./routes/contact'));
