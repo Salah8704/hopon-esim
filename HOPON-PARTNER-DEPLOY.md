@@ -1,39 +1,44 @@
-# Déploiement de HopOn Partner
+# Déploiement Hostinger — HopOn Partner
 
-## Ce qui est livré
+Cette branche conserve l'ancien code historique à la racine et fournit deux dossiers de production compatibles avec l'installation Hostinger réelle :
 
-- Portail public et espace partenaire : `/partner/`
-- Administration dédiée : `/partner/admin.html`
-- API : `/api/v1/partners/*`
-- Attribution Stripe et WooCommerce
-- Affiche PDF véhicule ou hébergement avec QR code personnel
-- Migration PostgreSQL : `hopon-backend/src/db/schema_partners.sql`
+- `deploy/frontend` : site HopOn v35 + correctif v35.1 + portail partenaire ;
+- `deploy/api` : API HopOn v30 Node.js + MySQL + attribution des commissions.
 
-## Variables obligatoires
+## Préparation obligatoire
 
-Ajouter à l'environnement du backend :
+1. Sauvegarder les fichiers du site et la base MySQL depuis Hostinger.
+2. Ne pas remplacer le fichier `.env` de production.
+3. Ajouter dans l'environnement de l'API :
 
 ```env
-SITE_URL=https://hopon.fr
-PARTNER_JWT_SECRET=une-cle-aleatoire-d-au-moins-32-caracteres
+PARTNER_JWT_SECRET=une-cle-aleatoire-differente-de-JWT_SECRET
 IP_HASH_SALT=une-autre-valeur-aleatoire
 ```
 
-Conserver aussi les variables existantes (`DATABASE_URL`, Stripe, Transatel, Redis et administration).
+## API `api.hopon.fr`
 
-## Mise en production
+1. Déployer le contenu de `deploy/api` dans l'application Node.js Hostinger.
+2. Exécuter `npm ci`.
+3. Exécuter `npm run migrate` : la migration MySQL ajoute uniquement les tables et colonnes partenaires manquantes.
+4. Redémarrer l'application avec `npm start`.
+5. Vérifier `https://api.hopon.fr/health` avant de toucher au frontend.
 
-1. Sauvegarder la base PostgreSQL.
-2. Exécuter `hopon-backend/src/db/schema_partners.sql` sur la base.
-3. Dans `hopon-backend`, exécuter `npm ci` puis redéployer le service API.
-4. Déployer `index.html` et le dossier `partner/` sur le site HopOn.
-5. Vérifier que le webhook Stripe vise `/api/v1/stripe/webhook`.
-6. Créer un compte test, l'activer dans `/partner/admin.html`, télécharger son affiche et effectuer une commande Stripe en mode test.
+## Frontend `hopon.fr`
 
-## Règles métier
+Après validation de l'API, déployer le contenu de `deploy/frontend` dans `public_html`.
 
-- Un nouveau partenaire reste `pending` jusqu'à validation.
-- Le taux de commission est `0` tant que l'administrateur ne l'a pas défini.
-- Une vente remboursée doit être passée à `cancelled` dans l'administration.
-- Une commission versée doit être passée à `paid`.
-- Les affiches ne sont téléchargeables que par les partenaires actifs.
+Pages ajoutées :
+
+- `/partner.html` : inscription, connexion, tableau de bord et affiche PDF ;
+- `/partner-admin.html` : validation des comptes et commissions.
+
+## Test avant paiements réels
+
+1. Créer un partenaire test.
+2. L'activer et définir sa commission dans `/partner-admin.html`.
+3. Télécharger l'affiche et ouvrir son QR code.
+4. Effectuer un paiement Stripe en mode test.
+5. Vérifier l'attribution dans le tableau de bord partenaire et l'administration.
+
+La fusion dans `main` ne doit être faite qu'après ces contrôles, car le site public renvoie actuellement une erreur 502 indépendante du module partenaire.

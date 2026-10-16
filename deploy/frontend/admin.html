@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#111a3b"><meta name="robots" content="noindex,nofollow">
+  <title>HopOn — Administration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css?v=32"><link rel="stylesheet" href="assets/admin.css?v=32">
+  <script defer src="assets/admin.js?v=32"></script>
+</head>
+<body class="admin-body">
+  <main id="login-screen" class="login-screen">
+    <form id="login-form" class="login-panel">
+      <img src="assets/hopon-logo.svg" alt="HopOn"><p class="eyebrow">Administration</p><h1>Bienvenue</h1>
+      <label>Adresse email<input type="email" name="email" value="contact@hopon.fr" autocomplete="username" required></label>
+      <label>Mot de passe<input type="password" name="password" autocomplete="current-password" required></label>
+      <button class="button" type="submit">Se connecter</button><p id="login-error" class="form-error" role="alert"></p>
+    </form>
+  </main>
+
+  <div id="admin-app" class="admin-app" hidden>
+    <aside class="sidebar">
+      <a href="index.html"><img src="assets/hopon-logo.svg" alt="HopOn"></a>
+      <nav><button class="active" data-view="dashboard">Vue d’ensemble</button><button data-view="sales">Ventes</button><button data-view="catalog">Catalogue et prix</button><button data-view="stock">Parc eSIM</button></nav>
+      <button id="logout" class="logout">Déconnexion</button>
+    </aside>
+    <section class="admin-main">
+      <header class="admin-header"><div><p class="eyebrow">HopOn</p><h1 id="view-title">Vue d’ensemble</h1></div><button id="mobile-nav" class="mobile-nav">Menu</button></header>
+
+      <div id="view-dashboard" class="view active">
+        <div id="metrics" class="metrics"><article><span>Ventes sur 30 jours</span><strong>—</strong></article><article><span>Chiffre d’affaires TTC</span><strong>—</strong></article><article><span>eSIM livrées</span><strong>—</strong></article><article><span>À vérifier</span><strong>—</strong></article></div>
+        <section class="admin-card"><div class="card-head"><div><h2>Dernières ventes</h2><p>Les commandes les plus récentes.</p></div><button class="link-button" data-go="sales">Toutes les ventes →</button></div><div id="recent-sales"></div></section>
+      </div>
+
+      <div id="view-sales" class="view">
+        <section class="admin-card"><div class="card-head"><div><h2>Tableau des ventes</h2><p>Paiements, clients et livraison des eSIM.</p></div><button class="secondary-button" id="refresh-sales">Actualiser</button></div><div id="sales-table"></div></section>
+      </div>
+
+      <div id="view-catalog" class="view">
+        <section class="admin-card"><div class="card-head"><div><h2>Catalogue et tarification</h2><p>Importez chaque mois le fichier « Service Provider Connect Start ».</p></div><div class="catalog-actions"><button class="secondary-button" id="import-prices">Importer le catalogue mensuel</button><input id="price-file" type="file" accept=".xlsx" hidden><button class="button button-small" id="sync-catalog">Synchroniser Transatel</button></div></div>
+          <div class="pricing-legend"><span>Achat HT : colonne J</span><span>Prix conseillé HT : colonne H</span><span>Majoration HopOn : automatique</span><span>Prix TTC : automatique</span></div>
+          <p id="last-catalog-sync" class="last-import" hidden></p><p id="last-catalog-import" class="last-import" hidden></p>
+          <div id="catalog-changes" class="catalog-alert" hidden>
+            <div class="catalog-alert-head"><div><strong><span id="catalog-change-count">0</span> changement(s) à vérifier</strong><small>Nouveaux forfaits, nouvelles destinations et changements de prix.</small></div><button class="secondary-button" id="review-changes">Marquer comme vérifiés</button></div>
+            <div id="catalog-change-list" class="catalog-change-list"></div>
+          </div>
+          <div class="catalog-tools">
+            <input id="catalog-search" type="search" placeholder="Rechercher un pays ou un forfait" aria-label="Rechercher un pays ou un forfait">
+            <select id="catalog-country-filter" aria-label="Filtrer par pays"><option value="">Tous les pays</option></select>
+            <button class="secondary-button" id="select-visible">Tout sélectionner</button>
+            <button class="secondary-button" id="publish-selected">Publier la sélection</button>
+            <button class="secondary-button" id="unpublish-selected">Dépublier la sélection</button>
+          </div>
+          <div class="markup-tools">
+            <label>Majoration sur le prix conseillé HT <span><input id="bulk-markup" type="number" min="0" max="10000" step="0.1" value="0" aria-label="Pourcentage de majoration"> %</span></label>
+            <button class="secondary-button" id="apply-markup">Calculer la sélection</button>
+            <button class="secondary-button" id="apply-markup-all">Recalculer tout</button>
+            <button class="button button-small" id="apply-markup-all-publish">Recalculer tout et publier</button>
+          </div>
+          <div id="catalog-table"></div>
+        </section>
+      </div>
+
+      <div id="view-stock" class="view">
+        <section class="admin-card"><div class="card-head"><div><h2>Parc eSIM Transatel</h2><p>Importez l’export CSV du parc pour ajouter les nouveaux profils et actualiser leur statut.</p></div><div class="catalog-actions"><button class="button button-small" id="import-stock">Importer le fichier parc CSV</button><input id="stock-file" type="file" accept=".csv,text/csv" hidden></div></div>
+          <div id="stock-metrics" class="stock-metrics"><article><span>Disponibles</span><strong>—</strong></article><article><span>Réservées</span><strong>—</strong></article><article><span>Attribuées</span><strong>—</strong></article><article><span>Indisponibles</span><strong>—</strong></article></div>
+          <p id="last-stock-import" class="last-import" hidden></p>
+          <div class="stock-help"><strong>Comment cela fonctionne</strong><p>Une nouvelle vente réserve automatiquement un profil disponible, ajoute le forfait Transatel avec l’ordre <code>preload</code>, récupère son QR code puis l’envoie au client. Une recharge réutilise le même profil et n’envoie pas de nouveau QR code.</p></div>
+        </section>
+      </div>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
