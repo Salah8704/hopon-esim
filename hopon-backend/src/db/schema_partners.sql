@@ -6,13 +6,16 @@ CREATE TABLE IF NOT EXISTS partners (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   partner_code    VARCHAR(50) NOT NULL UNIQUE,  -- ex: RIAD-MAR-001
   name            VARCHAR(200) NOT NULL,
-  type            VARCHAR(30) NOT NULL,  -- hotel|riad|agency|apartment|concierge|airline|other
+  business_name   VARCHAR(200),
+  password_hash   VARCHAR(200),
+  type            VARCHAR(30) NOT NULL,  -- driver|host|hotel|agency|other
   country_iso2    CHAR(2),
   email           VARCHAR(200) NOT NULL UNIQUE,
   phone           VARCHAR(30),
   website         VARCHAR(300),
   -- Commission
-  commission_pct  NUMERIC(5,2) NOT NULL DEFAULT 12.00,
+  commission_pct  NUMERIC(5,2) NOT NULL DEFAULT 0,
+  commission_fixed NUMERIC(10,2) NOT NULL DEFAULT 0,
   commission_type VARCHAR(20) DEFAULT 'percentage',  -- percentage|fixed
   -- Paiement
   payment_method  VARCHAR(30),   -- sepa|paypal|wise
@@ -20,6 +23,7 @@ CREATE TABLE IF NOT EXISTS partners (
   min_payout      NUMERIC(8,2) DEFAULT 20.00,
   -- Statut
   status          VARCHAR(20) DEFAULT 'pending',  -- pending|active|suspended|terminated
+  poster_version  INT DEFAULT 1,
   -- Métriques
   total_clicks    INT DEFAULT 0,
   total_sales     INT DEFAULT 0,
@@ -32,6 +36,11 @@ CREATE TABLE IF NOT EXISTS partners (
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS business_name VARCHAR(200);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS password_hash VARCHAR(200);
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS commission_fixed NUMERIC(10,2) NOT NULL DEFAULT 0;
+ALTER TABLE partners ADD COLUMN IF NOT EXISTS poster_version INT DEFAULT 1;
 
 -- Clics / visites depuis les liens partenaires
 CREATE TABLE IF NOT EXISTS partner_clicks (
@@ -60,12 +69,19 @@ CREATE TABLE IF NOT EXISTS partner_referrals (
   status              VARCHAR(20) DEFAULT 'pending',  -- pending|validated|paid|cancelled
   paid_at             TIMESTAMPTZ,
   payout_id           UUID,
+  source              VARCHAR(50) DEFAULT 'link',
+  notes               TEXT,
   created_at          TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE partner_referrals ADD COLUMN IF NOT EXISTS source VARCHAR(50) DEFAULT 'link';
+ALTER TABLE partner_referrals ADD COLUMN IF NOT EXISTS notes TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_preferrals_partner ON partner_referrals(partner_id);
 CREATE INDEX IF NOT EXISTS idx_preferrals_order   ON partner_referrals(order_id);
 CREATE INDEX IF NOT EXISTS idx_preferrals_status  ON partner_referrals(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_preferrals_order_unique ON partner_referrals(order_id) WHERE order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_preferrals_notes_unique ON partner_referrals(notes) WHERE notes IS NOT NULL;
 
 -- Versements de commissions
 CREATE TABLE IF NOT EXISTS commission_payouts (

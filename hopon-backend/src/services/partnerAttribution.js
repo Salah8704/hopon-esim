@@ -1,0 +1,8 @@
+'use strict';
+const { db } = require('../db/pool');
+function validCode(value){const code=String(value||'').trim().toUpperCase();return /^[A-Z0-9-]{6,50}$/.test(code)?code:null;}
+function validSource(value){const s=String(value||'link').toLowerCase();return ['qr_vehicle','qr_accommodation','link_vehicle','link_accommodation','link'].includes(s)?s:'link';}
+async function resolvePartner(code){const clean=validCode(code);if(!clean)return null;const {rows}=await db.query('SELECT * FROM partners WHERE partner_code=$1 AND status=$2',[clean,'active']);return rows[0]||null;}
+function calculateCommission(partner,saleAmount){const amount=Number(saleAmount||0);return partner.commission_type==='fixed'?Math.max(0,Number(partner.commission_fixed||0)):Math.max(0,Math.round(amount*Number(partner.commission_pct||0))/100);}
+async function recordPaidReferral({partnerCode,orderId,saleAmount,currency='EUR',countryIso2=null,source='link'}){const p=await resolvePartner(partnerCode);if(!p)return null;const commission=calculateCommission(p,saleAmount);const {rows}=await db.query(`INSERT INTO partner_referrals (partner_id,order_id,country_iso2,sale_amount,commission_pct,commission_amount,currency,status,source) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8) ON CONFLICT (order_id) DO NOTHING RETURNING *`,[p.id,orderId,countryIso2,Number(saleAmount),Number(p.commission_pct||0),commission,String(currency).toUpperCase(),validSource(source)]);await db.query('UPDATE orders SET partner_id=$1,partner_source=$2 WHERE id=$3',[p.id,validSource(source),orderId]);return rows[0]||null;}
+module.exports={validCode,validSource,resolvePartner,calculateCommission,recordPaidReferral};

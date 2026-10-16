@@ -120,7 +120,7 @@ async function reserveSimProfile(order) {
        AND (country_scope = $1 OR country_scope IS NULL)
      ORDER BY created_at ASC
      LIMIT 1
-     FOR UPDATE SKIP LOCKED`,  -- lock optimiste pour éviter les doubles réservations
+     FOR UPDATE SKIP LOCKED`,  // verrou optimiste pour éviter les doubles réservations
     [order.country_iso2]
   );
 

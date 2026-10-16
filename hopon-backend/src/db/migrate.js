@@ -7,9 +7,13 @@ const { Pool } = require('pg');
 
 async function migrate() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const sql  = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
+  const files = ['schema.sql', 'schema_partners.sql'];
   try {
-    await pool.query(sql);
+    for (const file of files) {
+      const sql = fs.readFileSync(path.join(__dirname, file), 'utf8');
+      await pool.query(sql);
+      console.log(`✅ ${file}`);
+    }
     console.log('✅ Migration terminée');
   } catch (e) {
     console.error('❌ Erreur migration:', e.message);
