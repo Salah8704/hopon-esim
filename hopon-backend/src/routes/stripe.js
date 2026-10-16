@@ -2,6 +2,8 @@
 const express = require('express');
 const router  = express.Router();
 const logger  = require('../utils/logger');
+const { db } = require('../db/pool');
+const { resolvePartner, validSource, calculateCommission } = require('../services/partnerAttribution');
 
 // Helper pour charger Stripe
 function getStripe() {
@@ -15,7 +17,7 @@ function getStripe() {
 // POST /api/v1/stripe/create-session
 router.post('/create-session', async (req, res) => {
   try {
-    const { email, name, product, amount, currency, success_url, cancel_url } = req.body;
+    const { email, name, product, amount, currency, success_url, cancel_url, partner_code, partner_source, country_iso2 } = req.body;
 
     if (!email) return res.status(400).json({ error: 'Email requis' });
     if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
@@ -23,6 +25,7 @@ router.post('/create-session', async (req, res) => {
     const stripe = getStripe();
     const siteUrl = process.env.SITE_URL || 'https://hopon.fr';
 
+    const partner = await resolvePartner(partner_code);
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'payment',
@@ -44,6 +47,9 @@ router.post('/create-session', async (req, res) => {
       metadata: {
         customer_name: name || '',
         product_ref: product || '',
+        partner_code: partner ? partner.partner_code : '',
+        partner_source: partner ? validSource(partner_source) : '',
+        country_iso2: String(country_iso2 || '').toUpperCase().slice(0, 2),
       },
       payment_intent_data: {
         description: 'hopOn eSIM — ' + (product || 'Forfait international'),
@@ -92,7 +98,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
       logger.info('[Stripe] Paiement confirmé: ' + session.id + ' ' + session.customer_email);
-      // Ici: activer l'eSIM via Transatel
+      const metadata = session.metadata || {};
+      const partner = await resolvePartner(metadata.partner_code);
+      if (partner) {
+        const saleAmount = Number(session.amount_total || 0) / 100;
+        const commission = calculateCommission(partner, saleAmount);
+        await db.query(`INSERT INTO partner_referrals
+          (partner_id,country_iso2,sale_amount,commission_pct,commission_amount,currency,status,source,notes)
+          VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$8) ON CONFLICT DO NOTHING`,
+          [partner.id,metadata.country_iso2||null,saleAmount,Number(partner.commission_pct||0),commission,String(session.currency||'eur').toUpperCase(),validSource(metadata.partner_source),`stripe:${session.id}`]);
+      }
     }
 
     res.json({ received: true });

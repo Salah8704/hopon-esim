@@ -1,0 +1,33 @@
+{
+  "name": "hopon-v2-backend",
+  "version": "1.5.0",
+  "private": true,
+  "description": "Backend HopOn — catalogue, tarification, Stripe et livraison eSIM",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node src/db.js --migrate"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.5",
+    "cors": "^2.8.5",
+    "cron": "^3.2.1",
+    "dotenv": "^16.4.7",
+    "exceljs": "^4.4.0",
+    "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "i18n-iso-countries": "^7.14.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.5",
+    "nodemailer": "^10.0.3",
+    "pdfkit": "^0.17.2",
+    "qrcode": "^1.5.4",
+    "stripe": "^17.5.0"
+  }
+}

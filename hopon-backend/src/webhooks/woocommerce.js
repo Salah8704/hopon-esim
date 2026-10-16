@@ -12,6 +12,7 @@ const { db }    = require('../db/pool');
 const esimSvc   = require('../services/esim');
 const logger    = require('../utils/logger');
 const { queue } = require('../jobs/queue');
+const { recordPaidReferral } = require('../services/partnerAttribution');
 
 const router = express.Router();
 
@@ -127,6 +128,14 @@ async function handleOrderEvent(wcOrder) {
     orderId = created.id;
   }
 
+  if (orderData.partnerCode) {
+    await recordPaidReferral({
+      partnerCode: orderData.partnerCode, orderId,
+      saleAmount: orderData.totalPrice, currency: orderData.currency,
+      countryIso2: orderData.countryIso2, source: orderData.partnerSource,
+    });
+  }
+
   // Enqueuer le traitement eSIM (async via Bull queue)
   await queue.add('process-esim', { orderId }, {
     attempts:  5,
@@ -166,6 +175,8 @@ async function mapWcOrder(wcOrder) {
     totalPrice:     parseFloat(wcOrder.total || 0),
     currency:       wcOrder.currency || 'EUR',
     paymentMethod:  wcOrder.payment_method_title || wcOrder.payment_method || null,
+    partnerCode:    extractMeta(wcOrder, ['hopon_partner_code','partner_code','ref']),
+    partnerSource:  extractMeta(wcOrder, ['hopon_partner_source','partner_source']) || 'link',
   };
 }
 
@@ -174,6 +185,11 @@ function extractCountryFromMeta(wcOrder) {
   const meta = wcOrder.meta_data || [];
   const countryMeta = meta.find(m => ['country_iso2', 'destination_country', 'hopon_country'].includes(m.key));
   return countryMeta?.value?.toUpperCase().substring(0, 2) || null;
+}
+
+function extractMeta(wcOrder, keys) {
+  const item = (wcOrder.meta_data || []).find(m => keys.includes(m.key));
+  return item?.value ? String(item.value).slice(0, 100) : null;
 }
 
 module.exports = router;
